@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Signal Engine</title>
+<style>
+:root {
+  --bg: #080810;
+  --surface: #0e0e1a;
+  --card: #121224;
+  --border: #1e1e38;
+  --blue: #3b82f6;
+  --blue-dim: rgba(59,130,246,0.10);
+  --red: #ef4444;
+  --red-dim: rgba(239,68,68,0.10);
+  --green: #10b981;
+  --green-dim: rgba(16,185,129,0.10);
+  --gold: #f59e0b;
+  --text: #e2e8f0;
+  --muted: #64748b;
+  --soft: #94a3b8;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: 'Georgia', serif; line-height: 1.7; overflow-x: hidden; }
+
+/* ── HERO ── */
+.hero {
+  min-height: 38vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center; padding: 60px 24px 48px;
+  background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(59,130,246,0.07), transparent);
+  border-bottom: 1px solid var(--border);
+}
+.hero-label { font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--blue); margin-bottom: 20px; }
+.hero h1 { font-size: clamp(2.4rem, 6vw, 4.5rem); font-weight: 400; letter-spacing: -0.02em; margin-bottom: 14px; }
+.hero p  { font-size: 1.05rem; color: var(--soft); max-width: 560px; margin-bottom: 36px; }
+
+/* ── STATUS BAR ── */
+.status-bar { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; justify-content: center; }
+.status-item { font-family: 'Courier New', monospace; font-size: 12px; color: var(--soft); }
+.status-item span { color: var(--text); }
+.market-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.market-dot.open   { background: var(--green); animation: pulse 2s infinite; }
+.market-dot.pre    { background: var(--gold);  animation: pulse 2s infinite; }
+.market-dot.closed { background: var(--muted); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+.key-wrap { display: flex; align-items: center; gap: 8px; }
+.key-input {
+  background: var(--surface); border: 1px solid var(--border); color: var(--soft);
+  font-family: 'Courier New', monospace; font-size: 11px; padding: 6px 10px;
+  border-radius: 2px; width: 168px; outline: none; transition: border-color .2s;
+}
+.key-input:focus { border-color: var(--blue); }
+.key-input.ok    { border-color: rgba(16,185,129,.5); }
+.key-input::placeholder { color: var(--muted); }
+.key-link { font-family: 'Courier New', monospace; font-size: 10px; color: var(--muted); text-decoration: none; letter-spacing: .5px; white-space: nowrap; }
+.key-link:hover { color: var(--blue); }
+.refresh-btn {
+  font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 1.5px;
+  text-transform: uppercase; background: transparent; border: 1px solid var(--border);
+  color: var(--soft); padding: 8px 18px; cursor: pointer; border-radius: 2px; transition: all .2s;
+}
+.refresh-btn:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); }
+.refresh-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ── LOADING ── */
+#loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 100px 24px; gap: 18px; }
+.ld-dots { display: flex; gap: 7px; }
+.ld-dots span { width: 7px; height: 7px; background: var(--blue); border-radius: 50%; animation: ldB 1.2s infinite; }
+.ld-dots span:nth-child(2){animation-delay:.2s} .ld-dots span:nth-child(3){animation-delay:.4s}
+@keyframes ldB { 0%,80%,100%{transform:scale(.7);opacity:.35} 40%{transform:scale(1.2);opacity:1} }
+.ld-text { font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 2px; color: var(--muted); }
+.error-box {
+  max-width: 500px; margin: 60px auto; padding: 24px;
+  border: 1px solid rgba(239,68,68,.3); background: var(--red-dim);
+  border-radius: 4px; font-family: 'Courier New', monospace; font-size: 12px;
+  color: var(--red); text-align: center; line-height: 1.8;
+}
+
+/* ── DASHBOARD ── */
+#dashboard { max-width: 1200px; margin: 0 auto; padding: 52px 24px 80px; }
+
+/* ── SIGNAL CARDS ── */
+.signal-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 14px; margin-bottom: 56px; }
+@media(max-width:960px){.signal-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:600px){.signal-grid{grid-template-columns:repeat(2,1fr)}}
+.scard {
+  background: var(--card); border: 1px solid var(--border); border-radius: 4px;
+  padding: 18px 16px 16px; transition: border-color .2s, transform .15s;
+}
+.scard:hover { transform: translateY(-2px); }
+.scard.long    { border-color: rgba(59,130,246,.45);  background: linear-gradient(160deg,var(--card),rgba(59,130,246,.05)); }
+.scard.short   { border-color: rgba(239,68,68,.45);   background: linear-gradient(160deg,var(--card),rgba(239,68,68,.05)); }
+.scard.neutral { border-color: rgba(100,116,139,.35); }
+.sc-ticker { font-family: 'Courier New', monospace; font-size: 19px; font-weight: 700; letter-spacing: 1px; margin-bottom: 2px; }
+.sc-name   { font-family: 'Courier New', monospace; font-size: 10px; color: var(--muted); margin-bottom: 12px; }
+.sc-price  { font-family: 'Courier New', monospace; font-size: 21px; margin-bottom: 3px; }
+.sc-ret    { font-family: 'Courier New', monospace; font-size: 12px; margin-bottom: 12px; }
+.pos{color:var(--green)} .neg{color:var(--red)} .neu{color:var(--muted)}
+canvas.sparkline { display: block; width: 100%; height: 52px; margin-bottom: 12px; }
+.sig-badge {
+  display: inline-block; font-family: 'Courier New', monospace; font-size: 10px;
+  font-weight: 700; letter-spacing: 2px; padding: 3px 9px; border-radius: 2px; margin-bottom: 12px;
+}
+.sig-badge.long    { background: var(--blue-dim); color: var(--blue); border: 1px solid rgba(59,130,246,.3); }
+.sig-badge.short   { background: var(--red-dim);  color: var(--red);  border: 1px solid rgba(239,68,68,.3); }
+.sig-badge.neutral { background: rgba(100,116,139,.1); color: var(--muted); border: 1px solid rgba(100,116,139,.25); }
+.sc-stats { font-family: 'Courier New', monospace; font-size: 10px; color: var(--muted); line-height: 1.9; margin-bottom: 12px; }
+.sc-stats .v { color: var(--soft); }
+.sc-stats .v.pos { color: var(--green); }
+.sc-stats .v.neg { color: var(--red); }
+.pred-wrap { margin-top: 2px; }
+.pred-lbl  { font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+.pred-track { height: 3px; background: var(--border); border-radius: 2px; position: relative; overflow: hidden; }
+.pred-fill  { position: absolute; top: 0; height: 100%; border-radius: 2px; transition: width .6s ease; }
+.pred-val   { font-family: 'Courier New', monospace; font-size: 10px; margin-top: 4px; }
+.pred-breakdown {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  font-family: 'Courier New', monospace; font-size: 9px; color: var(--muted); margin-top: 5px;
+}
+.pred-breakdown span { white-space: nowrap; }
+
+/* ── SECTION ── */
+.section { margin-bottom: 52px; }
+.sec-label { font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: var(--blue); margin-bottom: 6px; }
+.sec-title { font-size: 1.55rem; font-weight: 400; margin-bottom: 12px; }
+.sec-sub   { font-size: 13px; color: var(--muted); max-width: 720px; margin-bottom: 22px; line-height: 1.65; }
+
+/* ── REGRESSION TABLE ── */
+.rtable { width: 100%; border-collapse: collapse; font-family: 'Courier New', monospace; font-size: 12px; overflow-x: auto; display: block; }
+.rtable th { text-align: left; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); font-weight: 400; padding: 8px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.rtable td { padding: 10px 14px; border-bottom: 1px solid rgba(30,30,56,.6); color: var(--soft); white-space: nowrap; }
+.rtable tr:hover td { background: rgba(59,130,246,.025); }
+.rtable td:first-child { color: var(--text); font-size: 14px; font-weight: 700; }
+
+/* ── CROSS-ETF MATRIX ── */
+.matrix-wrap { overflow-x: auto; margin-bottom: 20px; }
+.mtable { border-collapse: collapse; font-family: 'Courier New', monospace; font-size: 11px; }
+.mtable th {
+  padding: 8px 16px; font-size: 10px; letter-spacing: 1px; font-weight: 400;
+  color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+.mtable th.row-hd {
+  text-align: right; font-size: 12px; font-weight: 700; color: var(--text);
+  border-bottom: none; border-right: 1px solid var(--border); padding-right: 18px;
+}
+.mtable th.corner { font-size: 9px; color: var(--muted); font-style: italic; text-align: left; padding-bottom: 12px; min-width: 120px; }
+.mtable td {
+  padding: 9px 16px; text-align: center; line-height: 1.5;
+  border: 1px solid rgba(30,30,56,.5);
+}
+.mtable td.diag  { color: var(--muted); }
+.mtable td.zero  { color: var(--muted); }
+.mtable td.mpos  { color: var(--green); background: rgba(16,185,129,.05); }
+.mtable td.mneg  { color: var(--red);   background: rgba(239,68,68,.05); }
+.mtable td.msig-pos { color: var(--green); background: rgba(16,185,129,.14); border-color: rgba(16,185,129,.3); font-weight: 700; }
+.mtable td.msig-neg { color: var(--red);   background: rgba(239,68,68,.14);  border-color: rgba(239,68,68,.3);  font-weight: 700; }
+.mt-tstat { font-size: 9px; font-weight: 400; opacity: .7; display: block; }
+.mtable td.msig-pos .mt-tstat, .mtable td.msig-neg .mt-tstat { opacity: .8; }
+.top-leads { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+.lead-hdr { width: 100%; font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.lead-chip {
+  font-family: 'Courier New', monospace; font-size: 11px;
+  background: var(--surface); border: 1px solid var(--border);
+  padding: 7px 14px; border-radius: 2px;
+}
+
+/* ── INTRADAY CARDS ── */
+.intra-card { background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 16px; }
+.ic-head    { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.ic-ticker  { font-family: 'Courier New', monospace; font-size: 16px; font-weight: 700; }
+.ic-date    { font-family: 'Courier New', monospace; font-size: 9px; color: var(--muted); }
+canvas.ispark { display: block; width: 100%; height: 48px; margin: 10px 0; }
+.ic-stats   { font-family: 'Courier New', monospace; font-size: 10px; color: var(--muted); line-height: 1.9; }
+.ic-stats .v { color: var(--soft); }
+.ic-divider { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 8px; }
+
+/* ── METHODOLOGY ── */
+.method-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+@media(max-width:720px){.method-grid{grid-template-columns:1fr}}
+.mcard { background: var(--surface); border: 1px solid var(--border); padding: 22px 20px; border-radius: 4px; }
+.mcard h3 { font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--blue); margin-bottom: 10px; }
+.mcard p  { font-size: 13px; color: var(--soft); line-height: 1.7; }
+.formula  { display: block; font-family: 'Courier New', monospace; font-size: 11px; color: var(--gold); background: var(--bg); padding: 7px 12px; border-radius: 2px; margin-top: 10px; border-left: 2px solid var(--gold); }
+
+/* ── FOOTER ── */
+footer { border-top: 1px solid var(--border); padding: 28px 24px; text-align: center; font-family: 'Courier New', monospace; font-size: 11px; color: var(--muted); line-height: 1.9; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-label">Quantitative Research</div>
+  <h1>Market Signal Engine</h1>
+  <p>OLS momentum &amp; mean-reversion · Cross-asset lead-lag · Intraday trend layer</p>
+  <div class="status-bar">
+    <div class="status-item" id="mkt-status"></div>
+    <div class="status-item" id="last-upd"></div>
+    <div class="key-wrap">
+      <input id="av-key-input" class="key-input" type="text"
+             placeholder="Alpha Vantage API key…"
+             title="Paste your free key — alphavantage.co">
+      <a href="https://www.alphavantage.co/support/#api-key" class="key-link" target="_blank">get free key ↗</a>
+    </div>
+    <button class="refresh-btn" id="refresh-btn" onclick="kickoff(true)">↻ Refresh</button>
+  </div>
+</div>
+
+<div id="loading">
+  <div class="ld-dots"><span></span><span></span><span></span></div>
+  <div class="ld-text" id="ld-text">Fetching market data&hellip;</div>
+</div>
+<div id="err-box"></div>
+
+<div id="dashboard" style="display:none">
+
+  <!-- ── Signal Cards ── -->
+  <div class="signal-grid" id="sig-grid"></div>
+
+  <!-- ── Daily Regression Table ── -->
+  <div class="section">
+    <div class="sec-label">Autocorrelation Model</div>
+    <div class="sec-title">Within-ETF Regression</div>
+    <p class="sec-sub">Rolling 60-day OLS: does yesterday's N-day return predict tomorrow's return? β₁ is the 1-day autocorrelation; β₅ is the 5-day momentum coefficient.</p>
+    <table class="rtable">
+      <thead>
+        <tr>
+          <th>ETF</th><th>β₁ (1-day lag)</th><th>t-stat</th>
+          <th>β₅ (5-day lag)</th><th>t-stat</th>
+          <th>R² (1d)</th><th>Auto Pred</th><th>Regime</th>
+        </tr>
+      </thead>
+      <tbody id="rtbody"></tbody>
+    </table>
+  </div>
+
+  <!-- ── Cross-ETF Matrix ── -->
+  <div class="section">
+    <div class="sec-label">Lead-Lag Analysis</div>
+    <div class="sec-title">Cross-Asset Regression Matrix</div>
+    <p class="sec-sub">Each cell: β from regressing the <em>column</em> ETF's next-day return on the <em>row</em> ETF's current return (rolling 60-day OLS). Bold cells exceed |t|&nbsp;≥&nbsp;2.0. A positive β means the row ETF's up-move today predicts the column ETF moving up tomorrow.</p>
+    <div class="matrix-wrap"><div id="cross-matrix-wrap"></div></div>
+    <div id="top-leads"></div>
+  </div>
+
+  <!-- ── Intraday Layer ── -->
+  <div class="section" id="intraday-section" style="display:none">
+    <div class="sec-label">Higher Frequency · 60-min Bars</div>
+    <div class="sec-title">Intraday Layer</div>
+    <p class="sec-sub">Prior trading day's hourly bars from Alpha Vantage. The intraday slope (linear trend of closes) is regressed against next-day returns over the available window to generate a third signal component.</p>
+    <div class="signal-grid" id="intra-grid"></div>
+  </div>
+
+  <!-- ── Methodology ── -->
+  <div class="section">
+    <div class="sec-label">How It Works</div>
+    <div class="sec-title">Methodology</div>
+    <div class="method-grid">
+      <div class="mcard">
+        <h3>Autocorrelation (50%)</h3>
+        <p>Per-ETF rolling 60-day OLS tests whether past 1-day and 5-day returns predict the next daily return. β &lt; 0 is mean reversion; β &gt; 0 is momentum.</p>
+        <code class="formula">r_{t+1} = α + β·r_t + ε</code>
+      </div>
+      <div class="mcard">
+        <h3>Cross-Asset (30%)</h3>
+        <p>Pairwise OLS across all ETF pairs. Each cell measures how much ETF A's return today predicts ETF B's return tomorrow. Significant lead-lag relationships are weighted into the combined signal.</p>
+        <code class="formula">r_{B,t+1} = α + β·r_{A,t} + ε</code>
+      </div>
+      <div class="mcard">
+        <h3>Intraday Slope (20%)</h3>
+        <p>When an Alpha Vantage key is set, 60-min bars are fetched. The prior day's intraday price slope is regressed against next-day returns to capture overnight momentum or reversal.</p>
+        <code class="formula">r_{t+1} = α + β·slope_t + ε</code>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  MARKET SIGNAL ENGINE &nbsp;·&nbsp; Data: Alpha Vantage · Yahoo Finance · Stooq &nbsp;·&nbsp; Rolling 60-day OLS<br>
+  Signals are statistical, not financial advice. Past regression fit ≠ future alpha.
+</footer>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════════════════════════
+const TICKERS    = ['SPY','QQQ','IWM','TLT','GLD'];
+const NAMES      = { SPY:'S&P 500', QQQ:'Nasdaq 100', IWM:'Russell 2000', TLT:'20yr Treasury', GLD:'Gold' };
+const CACHE_KEY  = 'mse_v4';
+const CACHE_TTL  = 8 * 3600 * 1000;
+const REG_WIN    = 60;
+const INTRA_WIN  = 20;    // rolling window for intraday regression (days)
+const SIG_THRESH = 0.002; // ±0.20%
+const AV_KEY_STORE = 'mse_av_key';
+
+// ══════════════════════════════════════════════════════════════
+//  MARKET STATUS
+// ══════════════════════════════════════════════════════════════
+function marketStatus() {
+  const et   = new Date(new Date().toLocaleString('en-US', { timeZone:'America/New_York' }));
+  const dow  = et.getDay();
+  const mins = et.getHours() * 60 + et.getMinutes();
+  if (dow === 0 || dow === 6) return { label:'Market Closed', detail:'Weekend', dot:'closed' };
+  if (mins >= 570 && mins < 960) {
+    const l = 960 - mins;
+    return { label:'Market Open', detail:`Closes in ${Math.floor(l/60)}h ${l%60}m`, dot:'open' };
+  }
+  if (mins >= 240 && mins < 570) {
+    const l = 570 - mins;
+    return { label:'Pre-Market', detail:`Opens in ${Math.floor(l/60)}h ${l%60}m`, dot:'pre' };
+  }
+  if (mins >= 960 && mins < 1200) return { label:'After Hours', detail:'', dot:'pre' };
+  return { label:'Market Closed', detail:'Opens 9:30 AM ET', dot:'closed' };
+}
+function tickStatus() {
+  const s = marketStatus();
+  document.getElementById('mkt-status').innerHTML =
+    `<span class="market-dot ${s.dot}"></span>${s.label}${s.detail ? ' · ' + s.detail : ''}`;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  DATA FETCHING
+// ══════════════════════════════════════════════════════════════
+const STOOQ_SYM = { SPY:'spy.us', QQQ:'qqq.us', IWM:'iwm.us', TLT:'tlt.us', GLD:'gld.us' };
+const PROXIES   = [
+  u => u,
+  u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u => `https://thingproxy.freeboard.io/fetch/${u}`
+];
+
+async function tryFetch(url, opts = {}) {
+  const r = await fetch(url, { ...opts, signal: AbortSignal.timeout(8000) });
+  if (!r.ok) throw new Error(r.status);
+  return r;
+}
+
+async function fetchAlphaVantage(ticker) {
+  const key = localStorage.getItem(AV_KEY_STORE);
+  if (!key) return null;
+  const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${ticker}&outputsize=compact&apikey=${key}`;
+  try {
+    const r = await tryFetch(url, { cache:'no-store' });
+    const j = await r.json();
+    if (j['Error Message'] || j['Note'] || j['Information']) return null;
+    const ts = j['Time Series (Daily)'];
+    if (!ts) return null;
+    const entries = Object.entries(ts)
+      .map(([d, v]) => ({ t: new Date(d).getTime()/1000, p: parseFloat(v['4. close']) }))
+      .filter(x => x.p > 0).sort((a,b) => a.t - b.t);
+    if (entries.length < 40) return null;
+    return { ticker, name: NAMES[ticker],
+      timestamps: entries.map(x => x.t),
+      prices:     entries.map(x => x.p),
+      livePrice:  entries.at(-1).p };
+  } catch (_) { return null; }
+}
+
+async function fetchYahoo(ticker) {
+  for (const host of ['query1','query2']) {
+    const base = `https://${host}.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=6mo`;
+    for (const proxy of PROXIES) {
+      try {
+        const r = await tryFetch(proxy(base), { headers:{ Accept:'application/json' }, cache:'no-store' });
+        const j = await r.json();
+        const res = j?.chart?.result?.[0];
+        if (!res) continue;
+        const ts     = res.timestamp;
+        const closes = res.indicators.quote[0].close;
+        const pairs  = ts.map((t,i) => ({ t, p:closes[i] })).filter(x => x.p > 0);
+        if (pairs.length < 40) continue;
+        return { ticker, name: NAMES[ticker],
+          timestamps: pairs.map(x => x.t),
+          prices:     pairs.map(x => x.p),
+          livePrice:  res.meta?.regularMarketPrice ?? pairs.at(-1).p };
+      } catch (_) {}
+    }
+  }
+  return null;
+}
+
+async function fetchStooq(ticker) {
+  const base = `https://stooq.com/q/d/l/?s=${STOOQ_SYM[ticker]}&i=d`;
+  for (const proxy of PROXIES.slice(1)) {
+    try {
+      const r   = await tryFetch(proxy(base), { cache:'no-store' });
+      const csv = await r.text();
+      if (!csv.includes('Date')) continue;
+      const pairs = [];
+      csv.trim().split('\n').slice(1).forEach(line => {
+        const cols = line.split(',');
+        if (cols.length < 5) return;
+        const p = parseFloat(cols[4]), t = new Date(cols[0]).getTime()/1000;
+        if (p > 0 && !isNaN(t)) pairs.push({ t, p });
+      });
+      if (pairs.length < 40) continue;
+      pairs.sort((a,b) => a.t - b.t);
+      const recent = pairs.slice(-130);
+      return { ticker, name: NAMES[ticker],
+        timestamps: recent.map(x => x.t),
+        prices:     recent.map(x => x.p),
+        livePrice:  recent.at(-1).p };
+    } catch (_) {}
+  }
+  return null;
+}
+
+async function fetchTicker(ticker) {
+  const r = await fetchAlphaVantage(ticker) ?? await fetchYahoo(ticker) ?? await fetchStooq(ticker);
+  if (!r) throw new Error(`All sources failed for ${ticker}`);
+  return r;
+}
+
+async function fetchIntraday(ticker) {
+  const key = localStorage.getItem(AV_KEY_STORE);
+  if (!key) return null;
+  const url = `https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${ticker}&interval=60min&outputsize=compact&apikey=${key}`;
+  try {
+    const r = await tryFetch(url, { cache:'no-store' });
+    const j = await r.json();
+    if (j['Error Message'] || j['Note'] || j['Information']) return null;
+    const ts = j['Time Series (60min)'];
+    if (!ts) return null;
+
+    const bars = Object.entries(ts).map(([dt, v]) => ({
+      dt, date: dt.split(' ')[0],
+      close: parseFloat(v['4. close']),
+      open:  parseFloat(v['1. open']),
+      high:  parseFloat(v['2. high']),
+      low:   parseFloat(v['3. low']),
+      vol:   parseFloat(v['5. volume'])
+    })).filter(b => b.close > 0).sort((a,b) => a.dt < b.dt ? -1 : 1);
+
+    if (bars.length < 6) return null;
+
+    // Group by date
+    const byDate = {};
+    bars.forEach(b => { (byDate[b.date] ??= []).push(b); });
+    const dates = Object.keys(byDate).sort();
+
+    // Most recent complete trading day
+    const etNow = new Date(new Date().toLocaleString('en-US', { timeZone:'America/New_York' }));
+    const todayStr = etNow.toISOString().split('T')[0];
+    const mktOpen  = etNow.getHours() * 60 + etNow.getMinutes() >= 570;
+    let priorDate  = dates.at(-1);
+    // If today's bars exist but market is closed (incomplete session), use prior day
+    if (priorDate === todayStr && !mktOpen && dates.length > 1) priorDate = dates.at(-2);
+
+    const dayBars = byDate[priorDate] || [];
+    if (dayBars.length < 3) return null;
+
+    const closes = dayBars.map(b => b.close);
+    const n = closes.length;
+    const xs  = closes.map((_, i) => i / Math.max(n - 1, 1));
+    const sfit = ols(xs, closes);
+    const slopePct = sfit.beta / closes[0]; // normalized: fraction per time-unit
+
+    return {
+      ticker,
+      priorDate,
+      isToday: priorDate === todayStr,
+      bars: dayBars,
+      closes,
+      hi: Math.max(...dayBars.map(b => b.high)),
+      lo: Math.min(...dayBars.map(b => b.low)),
+      slopePct,
+      closePos: dayBars.at(-1).close,
+      dayOpen:  dayBars[0].open,
+      dayClose: dayBars.at(-1).close,
+      allBars: bars,
+      byDate
+    };
+  } catch (_) { return null; }
+}
+
+async function fetchAll(force) {
+  if (!force) {
+    try {
+      const raw = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+      if (raw && (Date.now() - raw.ts) < CACHE_TTL) {
+        setUpd(`Cached · ${new Date(raw.ts).toLocaleTimeString()}`);
+        return { daily: raw.daily, intraday: raw.intraday ?? null };
+      }
+    } catch (_) {}
+  }
+  setUpd('Fetching daily prices…');
+  const daily = await Promise.all(TICKERS.map(fetchTicker));
+
+  let intraday = null;
+  if (localStorage.getItem(AV_KEY_STORE)) {
+    setLd('Fetching 60-min bars…');
+    const arr = await Promise.all(TICKERS.map(t => fetchIntraday(t).catch(() => null)));
+    intraday = Object.fromEntries(TICKERS.map((t,i) => [t, arr[i]]));
+  }
+
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), daily, intraday })); } catch (_) {}
+  setUpd(`Updated ${new Date().toLocaleTimeString('en-US', { timeZone:'America/New_York' })} ET`);
+  return { daily, intraday };
+}
+
+function setUpd(msg) { document.getElementById('last-upd').textContent = msg; }
+function setLd(msg)  { document.getElementById('ld-text').textContent  = msg; }
+
+// ══════════════════════════════════════════════════════════════
+//  MATH
+// ══════════════════════════════════════════════════════════════
+function ols(x, y) {
+  const n = x.length;
+  if (n < 4) return { alpha:0, beta:0, r2:0, tstat:0, n };
+  let sx=0, sy=0;
+  for (let i=0;i<n;i++){sx+=x[i];sy+=y[i];}
+  const xm=sx/n, ym=sy/n;
+  let sxy=0, sxx=0, syy=0;
+  for (let i=0;i<n;i++){const dx=x[i]-xm,dy=y[i]-ym;sxy+=dx*dy;sxx+=dx*dx;syy+=dy*dy;}
+  if (sxx===0) return { alpha:ym, beta:0, r2:0, tstat:0, n };
+  const beta=sxy/sxx, alpha=ym-beta*xm;
+  const r2 = syy>0 ? (sxy*sxy)/(sxx*syy) : 0;
+  let sse=0;
+  for (let i=0;i<n;i++){const e=y[i]-(alpha+beta*x[i]);sse+=e*e;}
+  const seBeta = Math.sqrt(sse/Math.max(n-2,1)/sxx);
+  const tstat  = seBeta > 0 ? beta/seBeta : 0;
+  return { alpha, beta, r2, tstat, n };
+}
+
+function dailyRets(prices) {
+  return prices.slice(1).map((p,i) => (p - prices[i]) / prices[i]);
+}
+function rollingSum(arr, w) {
+  return arr.map((_,i) => {
+    if (i < w-1) return null;
+    let s=0; for (let k=i-w+1;k<=i;k++) s+=arr[k]; return s;
+  });
+}
+function rollingMean(arr, w)   { return rollingSum(arr,w).map(s => s===null?null:s/w); }
+function rollingStdDev(arr, w) {
+  const means = rollingMean(arr, w);
+  return arr.map((_,i) => {
+    if (means[i]===null) return null;
+    const m=means[i]; let v=0;
+    for(let k=i-w+1;k<=i;k++) v+=(arr[k]-m)**2;
+    return Math.sqrt(v/w);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CROSS-ETF PAIRWISE REGRESSION
+// ══════════════════════════════════════════════════════════════
+function computeCrossETF(signals) {
+  // matrix[row][col] = OLS fit: col ETF's next-day return ~ row ETF's current return
+  return signals.map((pred, ri) =>
+    signals.map((targ, ci) => {
+      if (ri === ci) return null;
+      const pr = pred.rets, tr = targ.rets;
+      const minN = Math.min(pr.length, tr.length);
+      const xs=[], ys=[];
+      for (let t=1; t<minN; t++) { xs.push(pr[t-1]); ys.push(tr[t]); }
+      return ols(xs.slice(-REG_WIN), ys.slice(-REG_WIN));
+    })
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  INTRADAY SIGNAL
+// ══════════════════════════════════════════════════════════════
+function computeIntradaySignal(intra, dateMap) {
+  if (!intra?.byDate) return { pred:0, hasData:false };
+
+  const dates = Object.keys(intra.byDate).sort();
+  const pairs = [];
+
+  for (let i = 0; i < dates.length - 1; i++) {
+    const d    = dates[i];
+    const bars = intra.byDate[d];
+    if (!bars || bars.length < 3) continue;
+
+    const closes = bars.map(b => b.close);
+    const n = closes.length;
+    const xs = closes.map((_,k) => k / Math.max(n-1,1));
+    const sf = ols(xs, closes);
+    const slope = sf.beta / closes[0]; // normalized slope
+
+    const nextRet = dateMap[d];
+    if (nextRet === undefined || isNaN(nextRet)) continue;
+    pairs.push({ slope, nextRet });
+  }
+
+  if (pairs.length < 5) return { pred:0, hasData:false };
+
+  const fit = ols(pairs.map(p=>p.slope), pairs.map(p=>p.nextRet));
+  const pred = fit.alpha + fit.beta * intra.slopePct;
+
+  return { pred, beta:fit.beta, tstat:fit.tstat, r2:fit.r2, hasData:true,
+           slope:intra.slopePct, nObs:pairs.length };
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SIGNAL COMPUTATION  (two-pass)
+// ══════════════════════════════════════════════════════════════
+function computeSignals(allData, intradayMap) {
+
+  // ── Pass 1: per-ETF autocorrelation ──────────────────────
+  const signals = allData.map(({ ticker, name, prices, livePrice, timestamps }) => {
+    const rets = dailyRets(prices);
+    const N    = rets.length;
+    const cum5  = rollingSum(rets, 5);
+    const cum20 = rollingSum(rets, 20);
+
+    const x1=[],x5=[],x20=[],Y=[];
+    for (let t=20;t<N;t++) {
+      if (cum5[t-1]===null||cum20[t-1]===null) continue;
+      x1.push(rets[t-1]); x5.push(cum5[t-1]); x20.push(cum20[t-1]); Y.push(rets[t]);
+    }
+    const trim = a => a.slice(-REG_WIN);
+    const fit1  = ols(trim(x1), trim(Y));
+    const fit5  = ols(trim(x5), trim(Y));
+    const fit20 = ols(trim(x20),trim(Y));
+
+    const rToday = rets[N-1];
+    const r5d    = cum5[N-1]  ?? 0;
+    const r20d   = cum20[N-1] ?? 0;
+
+    const p1 = fit1.alpha + fit1.beta * rToday;
+    const p5 = fit5.alpha + fit5.beta * r5d;
+    const w1 = Math.max(0, Math.abs(fit1.tstat) - 1.0);
+    const w5 = Math.max(0, Math.abs(fit5.tstat) - 1.0);
+    const wt = w1 + w5;
+    const autoPred = wt > 0 ? (w1*p1 + w5*p5)/wt : (p1+p5)/2;
+
+    const regime = fit1.beta < -0.08 ? 'Mean Reversion'
+                 : fit1.beta >  0.08 ? 'Momentum' : 'Mixed';
+
+    const ma20 = rollingMean(prices, 20);
+    const sd20 = rollingStdDev(prices, 20);
+    const maZ  = ma20.at(-1) && sd20.at(-1)
+                 ? (prices.at(-1) - ma20.at(-1)) / sd20.at(-1) : 0;
+
+    // date → next-day return map (for intraday regression)
+    const dateMap = {};
+    (timestamps || []).forEach((t, i) => {
+      if (i < rets.length) {
+        dateMap[new Date(t * 1000).toISOString().split('T')[0]] = rets[i];
+      }
+    });
+
+    return {
+      ticker, name, prices, rets, ma20,
+      price: livePrice ?? prices.at(-1),
+      rToday, r5d, r20d,
+      fit1, fit5, fit20,
+      autoPred,
+      crossPred: 0,
+      intraSig: { pred:0, hasData:false },
+      pred: autoPred,
+      signal: 'NEUTRAL',
+      regime, maZ,
+      dateMap
+    };
+  });
+
+  // ── Pass 2: cross-ETF + intraday ──────────────────────────
+  const crossMatrix  = computeCrossETF(signals);
+  const currentRets  = signals.map(s => s.rToday);
+
+  signals.forEach((sig, i) => {
+    // Cross-ETF prediction for target ETF i
+    const cpArr = [];
+    crossMatrix.forEach((row, j) => {
+      if (j === i) return;
+      const fit = row[i]; // predictor=j, target=i
+      if (!fit) return;
+      const w = Math.max(0, Math.abs(fit.tstat) - 1.0);
+      if (w > 0) cpArr.push({ pred: fit.alpha + fit.beta * currentRets[j], w });
+    });
+    const cpW = cpArr.reduce((s,p) => s+p.w, 0);
+    sig.crossPred = cpW > 0 ? cpArr.reduce((s,p) => s+p.pred*p.w, 0)/cpW : 0;
+
+    // Intraday signal
+    if (intradayMap?.[sig.ticker]) {
+      sig.intraSig = computeIntradaySignal(intradayMap[sig.ticker], sig.dateMap);
+    }
+
+    // Weighted combination
+    const wA = 0.50, wC = 0.30, wI = sig.intraSig.hasData ? 0.20 : 0;
+    const wT = wA + wC + wI;
+    sig.pred   = (wA*sig.autoPred + wC*sig.crossPred + wI*sig.intraSig.pred) / wT;
+    sig.signal = sig.pred > SIG_THRESH ? 'LONG' : sig.pred < -SIG_THRESH ? 'SHORT' : 'NEUTRAL';
+  });
+
+  signals._crossMatrix = crossMatrix;
+  return signals;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CHART DRAWING
+// ══════════════════════════════════════════════════════════════
+function drawSpark(canvas, sig) {
+  const dpr=window.devicePixelRatio||1, W=canvas.clientWidth||180, H=52;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+
+  const pts = sig.prices.slice(-REG_WIN);
+  const ma  = sig.ma20.filter(v=>v!==null).slice(-pts.length);
+  const mOff= pts.length - ma.length;
+  const lo=Math.min(...pts)*0.9985, hi=Math.max(...pts)*1.0015, rng=hi-lo||1;
+  const sx=i=>(i/(pts.length-1))*W, sy=p=>H-2-((p-lo)/rng)*(H-4);
+  const rgb=sig.signal==='LONG'?'59,130,246':sig.signal==='SHORT'?'239,68,68':'100,116,139';
+
+  const grd=ctx.createLinearGradient(0,0,0,H);
+  grd.addColorStop(0,`rgba(${rgb},.18)`); grd.addColorStop(1,`rgba(${rgb},0)`);
+  ctx.beginPath();
+  pts.forEach((p,i)=>i===0?ctx.moveTo(sx(i),sy(p)):ctx.lineTo(sx(i),sy(p)));
+  ctx.lineTo(sx(pts.length-1),H); ctx.lineTo(0,H); ctx.closePath();
+  ctx.fillStyle=grd; ctx.fill();
+
+  ctx.beginPath();
+  pts.forEach((p,i)=>i===0?ctx.moveTo(sx(i),sy(p)):ctx.lineTo(sx(i),sy(p)));
+  ctx.strokeStyle=`rgba(${rgb},.9)`; ctx.lineWidth=1.5; ctx.stroke();
+
+  if (ma.length>2) {
+    ctx.beginPath();
+    ma.forEach((p,i)=>{const xi=sx(i+mOff);i===0?ctx.moveTo(xi,sy(p)):ctx.lineTo(xi,sy(p));});
+    ctx.strokeStyle='rgba(245,158,11,.55)'; ctx.lineWidth=1;
+    ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]);
+  }
+  ctx.beginPath(); ctx.arc(sx(pts.length-1),sy(pts.at(-1)),3,0,Math.PI*2);
+  ctx.fillStyle=`rgb(${rgb})`; ctx.fill();
+}
+
+function drawIntraSpark(canvas, bars) {
+  const dpr=window.devicePixelRatio||1, W=canvas.clientWidth||180, H=48;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+  if (!bars||bars.length<2) return;
+
+  const cls=bars.map(b=>b.close);
+  const lo=Math.min(...cls)*0.9985, hi=Math.max(...cls)*1.0015, rng=hi-lo||1;
+  const sx=i=>(i/(cls.length-1))*W, sy=p=>H-2-((p-lo)/rng)*(H-4);
+  const dayRet=(cls.at(-1)-cls[0])/cls[0];
+  const rgb=dayRet>0?'16,185,129':dayRet<0?'239,68,68':'100,116,139';
+
+  // Fill
+  const grd=ctx.createLinearGradient(0,0,0,H);
+  grd.addColorStop(0,`rgba(${rgb},.15)`); grd.addColorStop(1,`rgba(${rgb},0)`);
+  ctx.beginPath();
+  cls.forEach((p,i)=>i===0?ctx.moveTo(sx(i),sy(p)):ctx.lineTo(sx(i),sy(p)));
+  ctx.lineTo(sx(cls.length-1),H); ctx.lineTo(0,H); ctx.closePath();
+  ctx.fillStyle=grd; ctx.fill();
+
+  // Price line
+  ctx.beginPath();
+  cls.forEach((p,i)=>i===0?ctx.moveTo(sx(i),sy(p)):ctx.lineTo(sx(i),sy(p)));
+  ctx.strokeStyle=`rgba(${rgb},.9)`; ctx.lineWidth=1.5; ctx.stroke();
+
+  // Trend line (OLS)
+  if (cls.length>=3) {
+    const n=cls.length;
+    const fit=ols(cls.map((_,i)=>i/(n-1)), cls);
+    const y0=fit.alpha, y1=fit.alpha+fit.beta;
+    ctx.beginPath(); ctx.moveTo(0,sy(y0)); ctx.lineTo(W,sy(y1));
+    ctx.strokeStyle='rgba(245,158,11,.6)'; ctx.lineWidth=1;
+    ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  ctx.beginPath(); ctx.arc(sx(cls.length-1),sy(cls.at(-1)),2.5,0,Math.PI*2);
+  ctx.fillStyle=`rgb(${rgb})`; ctx.fill();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  RENDER — SIGNAL CARDS
+// ══════════════════════════════════════════════════════════════
+const pct  = (v,d=2) => (v>=0?'+':'')+(v*100).toFixed(d)+'%';
+const pctC = v => v>=0?'pos':'neg';
+const sigArrow = s => s==='LONG'?'▲ LONG':s==='SHORT'?'▼ SHORT':'─ NEUTRAL';
+
+function renderCards(signals) {
+  const grid = document.getElementById('sig-grid');
+  grid.innerHTML = '';
+  signals.forEach(sig => {
+    const card = document.createElement('div');
+    card.className = `scard ${sig.signal.toLowerCase()}`;
+
+    const barMax=0.006;
+    const barPct=Math.min(Math.abs(sig.pred)/barMax*50,50);
+    const barLeft=sig.pred>=0?'50%':`${50-barPct}%`;
+    const barCol=sig.pred>=0?'#3b82f6':'#ef4444';
+
+    const breakdown = [
+      `Auto ${pct(sig.autoPred,2)}`,
+      `Cross ${pct(sig.crossPred,2)}`,
+      ...(sig.intraSig.hasData ? [`Intra ${pct(sig.intraSig.pred,2)}`] : [])
+    ].map(t => `<span>${t}</span>`).join('');
+
+    card.innerHTML = `
+      <div class="sc-ticker">${sig.ticker}</div>
+      <div class="sc-name">${sig.name}</div>
+      <div class="sc-price">$${sig.price.toFixed(2)}</div>
+      <div class="sc-ret ${pctC(sig.rToday)}">${pct(sig.rToday)} today</div>
+      <canvas class="sparkline" style="height:52px"></canvas>
+      <div class="sig-badge ${sig.signal.toLowerCase()}">${sigArrow(sig.signal)}</div>
+      <div class="sc-stats">
+        <div>5d &nbsp;<span class="v ${pctC(sig.r5d)}">${pct(sig.r5d)}</span></div>
+        <div>20d <span class="v ${pctC(sig.r20d)}">${pct(sig.r20d)}</span></div>
+        <div>MA20 <span class="v">${sig.maZ>=0?'+':''}${sig.maZ.toFixed(1)}σ</span></div>
+        <div>Mode <span class="v">${sig.regime}</span></div>
+      </div>
+      <div class="pred-wrap">
+        <div class="pred-lbl">Predicted Tomorrow</div>
+        <div class="pred-track">
+          <div class="pred-fill" style="width:${barPct}%;left:${barLeft};background:${barCol}"></div>
+        </div>
+        <div class="pred-val ${pctC(sig.pred)}">${pct(sig.pred,3)}</div>
+        <div class="pred-breakdown">${breakdown}</div>
+      </div>`;
+
+    grid.appendChild(card);
+    requestAnimationFrame(() => drawSpark(card.querySelector('.sparkline'), sig));
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  RENDER — AUTOCORRELATION TABLE
+// ══════════════════════════════════════════════════════════════
+function renderTable(signals) {
+  const tbody = document.getElementById('rtbody');
+  tbody.innerHTML = '';
+  const tc = t => Math.abs(t)>2?'var(--text)':Math.abs(t)>1.5?'var(--soft)':'var(--muted)';
+  const bc = b => b<0?'var(--red)':b>0?'var(--green)':'var(--muted)';
+  signals.forEach(({ ticker, fit1, fit5, autoPred, regime }) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${ticker}</td>
+      <td style="color:${bc(fit1.beta)}">${fit1.beta>=0?'+':''}${fit1.beta.toFixed(3)}</td>
+      <td style="color:${tc(fit1.tstat)}">${fit1.tstat>=0?'+':''}${fit1.tstat.toFixed(2)}</td>
+      <td style="color:${bc(fit5.beta)}">${fit5.beta>=0?'+':''}${fit5.beta.toFixed(3)}</td>
+      <td style="color:${tc(fit5.tstat)}">${fit5.tstat>=0?'+':''}${fit5.tstat.toFixed(2)}</td>
+      <td>${(fit1.r2*100).toFixed(1)}%</td>
+      <td style="color:${autoPred>=0?'var(--green)':'var(--red)'}">${pct(autoPred,3)}</td>
+      <td style="color:var(--muted);font-size:10px">${regime}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  RENDER — CROSS-ETF MATRIX
+// ══════════════════════════════════════════════════════════════
+function renderCrossMatrix(signals, matrix) {
+  // Header row
+  let html = `<table class="mtable"><thead><tr>
+    <th class="corner">Predictor today →<br>Target tomorrow ↓</th>`;
+  TICKERS.forEach(t => { html += `<th>${t}</th>`; });
+  html += '</tr></thead><tbody>';
+
+  const sigLeads = [];
+
+  // matrix[row=predictor][col=target]
+  // We want to display: rows = predictor, cols = target
+  matrix.forEach((row, ri) => {
+    html += `<tr><th class="row-hd">${TICKERS[ri]}</th>`;
+    row.forEach((fit, ci) => {
+      if (fit === null) { html += '<td class="diag">─</td>'; return; }
+      const b=fit.beta, t=fit.tstat;
+      const sig = Math.abs(t) >= 2.0;
+      const cls = sig
+        ? (b >= 0 ? 'msig-pos' : 'msig-neg')
+        : (Math.abs(b) < 0.03 ? 'zero' : b > 0 ? 'mpos' : 'mneg');
+      html += `<td class="${cls}">${b>=0?'+':''}${b.toFixed(3)}<span class="mt-tstat">t=${t>=0?'+':''}${t.toFixed(1)}</span></td>`;
+      if (Math.abs(t) >= 1.5) sigLeads.push({ pred:TICKERS[ri], targ:TICKERS[ci], b, t });
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('cross-matrix-wrap').innerHTML = html;
+
+  // Top predictors
+  sigLeads.sort((a,b) => Math.abs(b.t) - Math.abs(a.t));
+  const topEl = document.getElementById('top-leads');
+  if (sigLeads.length === 0) {
+    topEl.innerHTML = '<div style="font-family:\'Courier New\',monospace;font-size:11px;color:var(--muted);margin-top:8px">No cross-ETF relationships exceed |t|=1.5 in the current 60-day window.</div>';
+    return;
+  }
+  const chips = sigLeads.slice(0, 6).map(({ pred, targ, b, t }) => {
+    const col = b >= 0 ? 'var(--green)' : 'var(--red)';
+    const dir = b >= 0 ? '↑' : '↓';
+    return `<div class="lead-chip">
+      <span style="color:var(--text);font-weight:700">${pred}</span>
+      <span style="color:var(--muted)"> → </span>
+      <span style="color:var(--text);font-weight:700">${targ}</span>
+      <span style="color:${col}"> ${dir} β=${b>=0?'+':''}${b.toFixed(3)}</span>
+      <span style="color:var(--muted)"> t=${t.toFixed(1)}</span>
+    </div>`;
+  });
+  topEl.innerHTML = `<div class="lead-hdr">Strongest cross-asset predictors (|t| ≥ 1.5)</div>
+    <div class="top-leads">${chips.join('')}</div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  RENDER — INTRADAY CARDS
+// ══════════════════════════════════════════════════════════════
+function renderIntradayCards(signals, intradayMap) {
+  if (!intradayMap) return;
+  const hasAny = TICKERS.some(t => intradayMap[t]);
+  if (!hasAny) return;
+
+  document.getElementById('intraday-section').style.display = 'block';
+  const grid = document.getElementById('intra-grid');
+  grid.innerHTML = '';
+
+  signals.forEach(sig => {
+    const intra = intradayMap[sig.ticker];
+    const card  = document.createElement('div');
+    card.className = 'intra-card';
+
+    if (!intra) {
+      card.innerHTML = `<div class="ic-head"><div class="ic-ticker">${sig.ticker}</div></div>
+        <div style="font-family:'Courier New',monospace;font-size:10px;color:var(--muted);padding:20px 0;text-align:center">No intraday data</div>`;
+      grid.appendChild(card); return;
+    }
+
+    const sp = intra.slopePct;
+    const spPct = (sp * 100).toFixed(2);
+    const spDir = sp >= 0 ? '↗' : '↘';
+    const spCol = sp >= 0 ? 'pos' : 'neg';
+    const cpPct = ((intra.closePos - intra.lo) / Math.max(intra.hi - intra.lo, 0.01) * 100).toFixed(0);
+    const dr    = (intra.dayClose - intra.dayOpen) / intra.dayOpen;
+    const is    = sig.intraSig;
+
+    card.innerHTML = `
+      <div class="ic-head">
+        <div class="ic-ticker">${sig.ticker}</div>
+        <div class="ic-date">${intra.priorDate}${intra.isToday ? ' · live' : ' · prior day'}</div>
+      </div>
+      <canvas class="ispark" style="height:48px"></canvas>
+      <div class="ic-stats">
+        <div>Slope <span class="v ${spCol}">${spDir} ${spPct}%</span></div>
+        <div>Close pos <span class="v">${cpPct}% of range</span></div>
+        <div>Day ret <span class="v ${pctC(dr)}">${pct(dr)}</span></div>
+        <div>Bars <span class="v">${intra.bars.length}</span></div>
+      </div>
+      <div class="ic-stats ic-divider">
+        <div>Intra pred <span class="v ${is.hasData?pctC(is.pred):'neu'}">${is.hasData?pct(is.pred,3):'N/A'}</span></div>
+        ${is.hasData?`<div>β <span class="v">${is.beta>=0?'+':''}${is.beta.toFixed(3)}</span> &nbsp; t <span class="v">${is.tstat>=0?'+':''}${is.tstat.toFixed(2)}</span> &nbsp; n <span class="v">${is.nObs}</span></div>`:''}
+      </div>`;
+
+    grid.appendChild(card);
+    requestAnimationFrame(() => drawIntraSpark(card.querySelector('.ispark'), intra.bars));
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MORNING AUTO-REFRESH
+// ══════════════════════════════════════════════════════════════
+function checkMorningRefresh() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+    if (!raw) return false;
+    const etN = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+    const etL = new Date(new Date(raw.ts).toLocaleString('en-US',{timeZone:'America/New_York'}));
+    const hr  = etN.getHours();
+    return etN.toDateString() !== etL.toDateString() && hr >= 4 && hr < 10;
+  } catch (_) { return false; }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MAIN
+// ══════════════════════════════════════════════════════════════
+let running = false;
+
+async function kickoff(force = false) {
+  if (running) return;
+  running = true;
+  const btn=document.getElementById('refresh-btn');
+  const ld=document.getElementById('loading');
+  const dash=document.getElementById('dashboard');
+  const err=document.getElementById('err-box');
+  btn.disabled=true; btn.textContent='…';
+  ld.style.display='flex'; dash.style.display='none'; err.innerHTML='';
+
+  try {
+    const { daily, intraday } = await fetchAll(force || checkMorningRefresh());
+    const signals = computeSignals(daily, intraday);
+
+    renderCards(signals);
+    renderTable(signals);
+    renderCrossMatrix(signals, signals._crossMatrix);
+    renderIntradayCards(signals, intraday);
+
+    ld.style.display='none'; dash.style.display='block';
+  } catch (e) {
+    ld.style.display='none';
+    err.innerHTML=`<div class="error-box">⚠ ${e.message}<br><small>Check API key or try again.</small></div>`;
+    console.error(e);
+  } finally {
+    running=false; btn.disabled=false; btn.textContent='↻ Refresh';
+  }
+}
+
+function initKeyInput() {
+  const input = document.getElementById('av-key-input');
+  const stored = localStorage.getItem(AV_KEY_STORE) || '';
+  input.value = stored;
+  if (stored) input.classList.add('ok');
+  input.addEventListener('change', () => {
+    const key = input.value.trim();
+    if (key) { localStorage.setItem(AV_KEY_STORE, key); input.classList.add('ok'); }
+    else     { localStorage.removeItem(AV_KEY_STORE);   input.classList.remove('ok'); }
+    localStorage.removeItem(CACHE_KEY);
+  });
+}
+
+// Init
+initKeyInput();
+tickStatus();
+setInterval(tickStatus, 30_000);
+kickoff(false);
+</script>
+</body>
+</html>
