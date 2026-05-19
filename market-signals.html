@@ -184,6 +184,24 @@ canvas.ispark { display: block; width: 100%; height: 48px; margin: 10px 0; }
 .mcard p  { font-size: 13px; color: var(--soft); line-height: 1.7; }
 .formula  { display: block; font-family: 'Courier New', monospace; font-size: 11px; color: var(--gold); background: var(--bg); padding: 7px 12px; border-radius: 2px; margin-top: 10px; border-left: 2px solid var(--gold); }
 
+/* ── METHODOLOGY DETAIL ── */
+.meth-block { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 28px 28px 24px; margin-bottom: 14px; }
+.meth-block h3 { font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--blue); margin-bottom: 16px; }
+.meth-block h4 { font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin: 18px 0 8px; }
+.meth-block p  { font-size: 13px; color: var(--soft); line-height: 1.75; margin-bottom: 10px; }
+.eq { display: block; font-family: 'Courier New', monospace; font-size: 12px; color: var(--gold); background: var(--bg); padding: 10px 16px; border-radius: 2px; margin: 10px 0; border-left: 2px solid var(--gold); line-height: 1.8; }
+.eq em { color: var(--soft); font-style: normal; }
+.meth-spec { width: 100%; border-collapse: collapse; font-family: 'Courier New', monospace; font-size: 11px; margin: 12px 0; }
+.meth-spec th { text-align: left; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); font-weight: 400; padding: 6px 12px 6px 0; border-bottom: 1px solid var(--border); }
+.meth-spec td { padding: 7px 12px 7px 0; border-bottom: 1px solid rgba(30,30,56,.5); color: var(--soft); vertical-align: top; }
+.meth-spec td:first-child { color: var(--text); white-space: nowrap; padding-right: 24px; }
+.meth-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media(max-width:720px){.meth-cols{grid-template-columns:1fr}}
+.caveat-list { list-style: none; margin: 0; padding: 0; }
+.caveat-list li { font-size: 12px; color: var(--soft); line-height: 1.75; padding: 5px 0; border-bottom: 1px solid rgba(30,30,56,.5); font-family: 'Courier New', monospace; }
+.caveat-list li:last-child { border-bottom: none; }
+.caveat-list li::before { content: '—'; color: var(--muted); margin-right: 8px; }
+
 /* ── FOOTER ── */
 footer { border-top: 1px solid var(--border); padding: 28px 24px; text-align: center; font-family: 'Courier New', monospace; font-size: 11px; color: var(--muted); line-height: 1.9; }
 </style>
@@ -254,23 +272,106 @@ footer { border-top: 1px solid var(--border); padding: 28px 24px; text-align: ce
 
   <!-- ── Methodology ── -->
   <div class="section">
-    <div class="sec-label">How It Works</div>
-    <div class="sec-title">Methodology</div>
-    <div class="method-grid">
-      <div class="mcard">
-        <h3>Autocorrelation (50%)</h3>
-        <p>Per-ETF rolling 60-day OLS tests whether past 1-day and 5-day returns predict the next daily return. β &lt; 0 is mean reversion; β &gt; 0 is momentum.</p>
-        <code class="formula">r_{t+1} = α + β·r_t + ε</code>
+    <div class="sec-label">Methodology</div>
+    <div class="sec-title">Statistical Framework</div>
+    <p class="sec-sub">Three independent OLS signal layers combined into a single next-day return forecast per instrument. All regressions share a 60-trading-day rolling estimation window, re-estimated on each page load against the most recent available close prices.</p>
+
+    <!-- Model 1 -->
+    <div class="meth-block">
+      <h3>Layer 1 · Serial Autocorrelation &nbsp;(base weight 50%)</h3>
+      <p>For each ETF <em>i</em>, two separate OLS regressions are estimated over the trailing <em>W</em> = 60 trading-day window:</p>
+      <code class="eq">r<sub>i,t+1</sub> = α₁ + β₁ · r<sub>i,t</sub> + ε &nbsp;&nbsp;&nbsp; <em>(1-day lag)</em>
+r<sub>i,t+1</sub> = α₅ + β₅ · Σr<sub>i,t-k</sub> + ε &nbsp;&nbsp; k=0..4 &nbsp;<em>(5-day cumulative lag)</em></code>
+      <p>Returns are computed as simple percentage changes: r<sub>t</sub> = (P<sub>t</sub> − P<sub>t−1</sub>) / P<sub>t−1</sub>. Each model produces a point prediction for tomorrow. The two predictions are blended using t-statistic-derived weights to down-weight whichever lag is showing less significance in the current window:</p>
+      <code class="eq">ŷ<sub>auto</sub> = ( w₁·ŷ₁ + w₅·ŷ₅ ) / (w₁ + w₅) &nbsp;&nbsp; where wₖ = max(0, |t<sub>k</sub>| − 1.0)</code>
+      <p>If both t-stats fall below 1.0 (both weights zero), the two predictions are averaged with equal weight. β₁ &lt; 0 indicates mean reversion over the estimation window; β₁ &gt; 0 indicates momentum. The regime label (Mean Reversion / Momentum / Mixed) is assigned at a |β₁| &gt; 0.08 threshold.</p>
+      <table class="meth-spec">
+        <thead><tr><th>Parameter</th><th>Value</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Window W</td><td>60 trading days</td><td>~3 calendar months of daily closes</td></tr>
+          <tr><td>Lags estimated</td><td>1-day, 5-day cumulative</td><td>Captures both daily reversal and weekly drift</td></tr>
+          <tr><td>Estimation</td><td>OLS (closed-form)</td><td>No intercept suppression; α estimated freely</td></tr>
+          <tr><td>t-statistic</td><td>β / SE(β); SE from residual MSE</td><td>df = n − 2 per regression</td></tr>
+          <tr><td>Regime threshold</td><td>|β₁| &gt; 0.08</td><td>Heuristic, not a hypothesis test</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Model 2 -->
+    <div class="meth-block">
+      <h3>Layer 2 · Cross-Asset Lead-Lag &nbsp;(base weight 30%)</h3>
+      <p>A 5×5 pairwise regression matrix is estimated. Each off-diagonal cell (j → i) fits the return of instrument <em>i</em> tomorrow against the return of instrument <em>j</em> today, over the same 60-day rolling window:</p>
+      <code class="eq">r<sub>i,t+1</sub> = α<sub>ji</sub> + β<sub>ji</sub> · r<sub>j,t</sub> + ε &nbsp;&nbsp; ∀ j ≠ i</code>
+      <p>This captures systematic lead-lag relationships across asset classes — e.g. whether Treasury moves today predict equity moves tomorrow. The cross-asset prediction for target <em>i</em> is a t-stat-weighted average across all predictor instruments <em>j</em>:</p>
+      <code class="eq">ŷ<sub>cross,i</sub> = Σ<sub>j≠i</sub> w<sub>ji</sub> · (α<sub>ji</sub> + β<sub>ji</sub> · r<sub>j,today</sub>) / Σ w<sub>ji</sub>
+where w<sub>ji</sub> = max(0, |t<sub>ji</sub>| − 1.0)</code>
+      <p>Predictor–target pairs with |t| &lt; 1.0 receive zero weight and do not influence the cross prediction. The matrix display bolds cells where |t| ≥ 2.0; the "strongest predictors" chip list surfaces pairs with |t| ≥ 1.5.</p>
+      <table class="meth-spec">
+        <thead><tr><th>Parameter</th><th>Value</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Universe</td><td>SPY, QQQ, IWM, TLT, GLD</td><td>20 off-diagonal pairs</td></tr>
+          <tr><td>Lag structure</td><td>1-day only</td><td>j return at t → i return at t+1</td></tr>
+          <tr><td>Display threshold</td><td>|t| ≥ 2.0 (bold), |t| ≥ 1.5 (chips)</td><td>~95% and ~86% confidence at n=60</td></tr>
+          <tr><td>Weighting</td><td>t-stat excess above 1.0, floored at 0</td><td>Same scheme as Layer 1</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Model 3 -->
+    <div class="meth-block">
+      <h3>Layer 3 · Intraday Slope Regression &nbsp;(base weight 20%, requires API key)</h3>
+      <p>When an Alpha Vantage key is present, 60-minute OHLCV bars are fetched for each instrument. For each historical trading day in the intraday dataset, the intraday price trend is summarized as the OLS slope of hourly closes, normalized by the opening close of that day:</p>
+      <code class="eq">slope<sub>d</sub> = β̂ / C<sub>d,0</sub> &nbsp;&nbsp; where β̂ from: C<sub>d,k</sub> = a + β·(k / (n−1)) + ε, k=0..n−1</code>
+      <p>This normalized slope (units: fraction per time-unit) is then regressed against the <em>next</em> trading day's opening-to-close return, building a training set of (slope, next-day return) pairs. The most recent intraday session's slope is projected through the fitted model:</p>
+      <code class="eq">r<sub>i,t+1</sub> = α<sub>intra</sub> + β<sub>intra</sub> · slope<sub>i,t</sub> + ε
+ŷ<sub>intra</sub> = α̂<sub>intra</sub> + β̂<sub>intra</sub> · slope<sub>i,today</sub></code>
+      <p>A minimum of 5 training pairs is required; if fewer are available the intraday component is dropped and the remaining two layers are renormalized to sum to 100%.</p>
+      <table class="meth-spec">
+        <thead><tr><th>Parameter</th><th>Value</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Bar frequency</td><td>60-minute</td><td>Alpha Vantage TIME_SERIES_INTRADAY</td></tr>
+          <tr><td>Slope normalization</td><td>β̂ / C<sub>d,0</sub></td><td>Makes slope comparable across price levels</td></tr>
+          <tr><td>Training minimum</td><td>5 days</td><td>Layer dropped if insufficient history</td></tr>
+          <tr><td>Session selection</td><td>Most recent complete session</td><td>Today excluded if market is still open</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Signal combination + data -->
+    <div class="meth-cols">
+      <div class="meth-block">
+        <h3>Signal Combination &amp; Decision Rule</h3>
+        <p>The three layer predictions are combined into a single scalar forecast:</p>
+        <code class="eq">ŷ<sub>final</sub> = (0.50·ŷ<sub>auto</sub> + 0.30·ŷ<sub>cross</sub> + w<sub>I</sub>·ŷ<sub>intra</sub>) / (0.80 + w<sub>I</sub>)
+w<sub>I</sub> = 0.20 if intraday data available, else 0</code>
+        <p>The signal classification applies a symmetric dead-band threshold:</p>
+        <code class="eq">signal =  LONG    if ŷ<sub>final</sub> &gt; +0.20%
+          SHORT   if ŷ<sub>final</sub> &lt; −0.20%
+          NEUTRAL otherwise</code>
+        <p>The ±0.20% threshold is a fixed heuristic — roughly one-quarter of the typical daily absolute move for these instruments — intended to filter noise rather than to optimize expected return.</p>
+        <h4>Caching &amp; Refresh</h4>
+        <p>Fetched data is cached in browser localStorage with an 8-hour TTL. On page load between 4:00–9:30 AM ET on any new trading day, the cache is automatically invalidated and fresh data is pulled.</p>
       </div>
-      <div class="mcard">
-        <h3>Cross-Asset (30%)</h3>
-        <p>Pairwise OLS across all ETF pairs. Each cell measures how much ETF A's return today predicts ETF B's return tomorrow. Significant lead-lag relationships are weighted into the combined signal.</p>
-        <code class="formula">r_{B,t+1} = α + β·r_{A,t} + ε</code>
-      </div>
-      <div class="mcard">
-        <h3>Intraday Slope (20%)</h3>
-        <p>When an Alpha Vantage key is set, 60-min bars are fetched. The prior day's intraday price slope is regressed against next-day returns to capture overnight momentum or reversal.</p>
-        <code class="formula">r_{t+1} = α + β·slope_t + ε</code>
+
+      <div class="meth-block">
+        <h3>Data Sources &amp; Known Limitations</h3>
+        <h4>Data Pipeline</h4>
+        <ul class="caveat-list">
+          <li>Primary: Alpha Vantage (TIME_SERIES_DAILY, native CORS, free tier 25 req/day)</li>
+          <li>Fallback 1: Yahoo Finance v8 chart API via CORS proxies (query1/query2 × 4 proxies)</li>
+          <li>Fallback 2: Stooq CSV download via CORS proxies</li>
+          <li>Intraday: Alpha Vantage only (TIME_SERIES_INTRADAY, 60min); no fallback</li>
+        </ul>
+        <h4>Limitations</h4>
+        <ul class="caveat-list">
+          <li>All regressions are in-sample over the trailing window — no walk-forward or out-of-sample validation</li>
+          <li>R² on short-horizon return regressions is typically &lt;5%; statistically significant β does not imply large expected return</li>
+          <li>No transaction costs, slippage, or bid-ask spread modeled</li>
+          <li>Cross-asset β estimates are unstable; 60-day window is short relative to structural regime changes</li>
+          <li>Intraday slope regressed on next-day return conflates overnight gap with intraday trend</li>
+          <li>Free-tier API rate limits (25 req/day Alpha Vantage) restrict same-day re-estimation frequency</li>
+          <li>Signals are purely statistical — no macro, earnings, or event calendar conditioning</li>
+        </ul>
       </div>
     </div>
   </div>
