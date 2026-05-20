@@ -85,10 +85,6 @@ input[type=number]{-moz-appearance:textfield}
   <h1>TSLA</h1>
   <div class="hinp"><label>Shares Held</label><input type="number" id="shares" value="550" oninput="render()"></div>
   <div class="stat"><span class="lbl">Current Portfolio</span><span class="val grn" id="s-port">—</span></div>
-  <div class="stat"><span class="lbl">Baseline 2030</span><span class="val" id="s-b30">—</span></div>
-  <div class="stat"><span class="lbl">Baseline 2035</span><span class="val" id="s-b35">—</span></div>
-  <div class="stat"><span class="lbl">2030 Return</span><span class="val ylw" id="s-ret">—</span></div>
-  <div class="stat"><span class="lbl">Mkt Cap 2030</span><span class="val" id="s-mc30">—</span></div>
   <div class="pgroup">
     <div class="hinp"><label>Current Price $</label><input type="number" id="cur" value="400" oninput="render()"></div>
     <button id="pfetch" onclick="fetchPrice()">↻ Price</button>
@@ -102,7 +98,7 @@ input[type=number]{-moz-appearance:textfield}
       <div class="slbl">Scenario</div>
       <div class="sc-btns">
         <button class="btn bear" onclick="loadPreset('bear')">Bear</button>
-        <button class="btn base on" onclick="loadPreset('baseline')">Baseline</button>
+        <button class="btn base on" onclick="loadPreset('baseline')">Base</button>
         <button class="btn bull" onclick="loadPreset('bull')">Bull</button>
       </div>
       <div class="sc-desc" id="sc-desc"></div>
@@ -110,11 +106,11 @@ input[type=number]{-moz-appearance:textfield}
     <hr>
     <div class="assum">
       <div class="slbl">Model Assumptions</div>
-      <b>Each scenario has distinct assumptions</b> — switch scenarios then open the Assumptions tab.<br><br>
-      <b>Shares:</b> Base 3.8→4.6B (dilution), Bear →5.3B, Bull →3.8B (modest buybacks — 2B scenario not feasible at $20K+ prices).<br><br>
+      <b>Each scenario has distinct assumptions.</b> Switch scenarios then open the Assumptions tab.<br><br>
+      <b>Shares:</b> Base 3.8→4.6B (dilution), Bear →5.3B, Bull →3.8B (modest buybacks; 2B scenario not feasible at $20K+ prices).<br><br>
       <b>P/EBITDA:</b> Base 100×→22×, Bear 80×→18×, Bull 130×→20×.<br><br>
       <b>Bull</b> is Elon's stated aim: Robotaxi 90% market share, 250M Optimus units, AI chip fab. Path to ~$40K/share.<br><br>
-      <b>Baseline</b> is conservative, Apr 2026 spreadsheet. Update upward as news comes in.
+      <b>Base</b> is conservative, Apr 2026 spreadsheet. Update upward as news comes in.
     </div>
   </div>
 
@@ -132,7 +128,7 @@ input[type=number]{-moz-appearance:textfield}
           <thead><tr>
             <th>Year</th>
             <th class="cb">Bear</th>
-            <th class="cbl">Baseline</th>
+            <th class="cbl">Base</th>
             <th class="cbu">Bull</th>
           </tr></thead>
           <tbody id="tb"></tbody>
@@ -174,7 +170,7 @@ const SC={
     EV:[10.5,12.5,16,18,19,25,26,22,24,27,28,29,27],
   },
   baseline:{
-    desc:'Apr 2026 spreadsheet estimates. Conservative and sandbagged — 18M Robotaxis, 30M Optimus units by 2038. Designed to update upward as visibility improves.',
+    desc:'Apr 2026 spreadsheet estimates. Conservative and sandbagged: 18M Robotaxis, 30M Optimus units by 2038. Designed to update upward as visibility improves.',
     SO:[3.8,3.9,4.0,4.1,4.2,4.3,4.4,4.5,4.5,4.55,4.6,4.6,4.6],
     BM:[100,100,100,90,80,70,60,50,28,25,24,23,22],
     ER:[0.02,1.12,2.24,6.72,27.56,36.75,73.50,91.88,294.00,315.00,312.00,331.50,351.00],
@@ -255,7 +251,7 @@ function render(){
   const prices=s=>s.map(d=>d.p);
   const ds=[
     {label:'Bear',    data:prices(sc.bear),borderColor:'#ef5350',tension:.4,pointRadius:2,borderWidth:1.5,fill:false},
-    {label:'Baseline',data:prices(sc.base),borderColor:'#64b5f6',tension:.4,pointRadius:2,borderWidth:2,  fill:false},
+    {label:'Base',data:prices(sc.base),borderColor:'#64b5f6',tension:.4,pointRadius:2,borderWidth:2,  fill:false},
     {label:'Bull',    data:prices(sc.bull),borderColor:'#66bb6a',tension:.4,pointRadius:2,borderWidth:1.5,fill:false},
   ];
   if(curP) ds.unshift({label:'Today',data:Y.map(()=>curP),borderColor:'rgba(255,255,255,.15)',tension:0,pointRadius:0,borderWidth:1,borderDash:[2,4],fill:false});
@@ -266,7 +262,7 @@ function render(){
       legend:{labels:{color:'#555',font:{size:11},boxWidth:14,padding:14}},
       tooltip:{callbacks:{label:ctx=>{
         if(ctx.dataset.label==='Today') return` Today: ${fp(ctx.raw)}`;
-        const key={Bear:'bear',Baseline:'base',Bull:'bull'}[ctx.dataset.label];
+        const key={Bear:'bear',Base:'base',Bull:'bull'}[ctx.dataset.label];
         const row=sc[key]?.find(d=>d.yr===Y[ctx.dataIndex]);
         return` ${ctx.dataset.label}: ${fp(ctx.raw)} | Portfolio: ${fv(ctx.raw*N)}${row?' | Mkt Cap: '+fmc(row.mc):''}`;
       }}}
@@ -322,7 +318,7 @@ function renderTab2(){
     });
   }
 
-  const scLabel={bear:'Bear',baseline:'Baseline',bull:'Bull'}[activeScenario];
+  const scLabel={bear:'Bear',baseline:'Base',bull:'Bull'}[activeScenario];
   document.getElementById('atbl-hdr').innerHTML=`<th>Metric · ${scLabel}</th>`+Y.map(y=>`<th>${y}</th>`).join('');
 
   const rows=[
