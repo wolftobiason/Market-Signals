@@ -237,15 +237,7 @@ function render(){
     bull:compute('bull')
   };
 
-  if(curP){
-    document.getElementById('s-port').textContent=fv(curP*N);
-    const b30=sc.base.find(d=>d.yr===2030);
-    document.getElementById('s-ret').textContent=b30?'×'+(b30.p/curP).toFixed(1):'—';
-  }
-  const b30=sc.base.find(d=>d.yr===2030),b35=sc.base.find(d=>d.yr===2035);
-  document.getElementById('s-b30').textContent=b30?fp(b30.p):'—';
-  document.getElementById('s-b35').textContent=b35?fp(b35.p):'—';
-  document.getElementById('s-mc30').textContent=b30?fmc(b30.mc):'—';
+  if(curP) document.getElementById('s-port').textContent=fv(curP*N);
   document.getElementById('sc-desc').textContent=SC[activeScenario].desc;
 
   const prices=s=>s.map(d=>d.p);
