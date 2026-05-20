@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TSLA Portfolio Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#0a0a0a;--surf:#131313;--brd:#222;--red:#e31937;--txt:#bbb;--mut:#444;--grn:#4caf50;--ylw:#ffd54f;--blu:#64b5f6}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+.hdr{background:var(--surf);border-bottom:1px solid var(--brd);padding:10px 20px;display:flex;align-items:center;gap:20px;flex-shrink:0;height:54px}
+.hdr h1{font-size:22px;font-weight:800;color:var(--red);letter-spacing:3px;margin-right:4px}
+.stat{display:flex;flex-direction:column;gap:1px}
+.stat .lbl{font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:.6px}
+.stat .val{font-size:14px;font-weight:600;color:#ddd}
+.stat .val.grn{color:var(--grn)}.stat .val.ylw{color:var(--ylw)}
+.hinp{display:flex;flex-direction:column;gap:1px}
+.hinp label{font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:.6px}
+.hinp input{background:#1a1a1a;border:1px solid var(--brd);color:#fff;padding:3px 6px;border-radius:3px;width:72px;font-size:13px;font-weight:600;outline:none;text-align:right}
+.hinp input:focus{border-color:#555}
+.pgroup{margin-left:auto;display:flex;align-items:center;gap:10px}
+.pgroup .hinp input{width:82px}
+#pfetch{font-size:11px;color:#555;cursor:pointer;background:none;border:1px solid var(--brd);padding:3px 8px;border-radius:3px;color:#777}
+#pfetch:hover{border-color:#555;color:#aaa}
+#ptime{font-size:9px;color:var(--mut);min-width:30px}
+
+.layout{display:grid;grid-template-columns:240px 1fr;flex:1;overflow:hidden}
+.sidebar{background:var(--surf);border-right:1px solid var(--brd);padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:16px}
+.slbl{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--mut);margin-bottom:8px}
+.sc-btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
+.btn{padding:7px 4px;border:1px solid var(--brd);background:transparent;color:#777;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.4px;transition:all .15s}
+.btn:hover{border-color:#3a3a3a;color:var(--txt)}
+.bear.on{background:#4a1010;border-color:#ef5350;color:#ef5350}
+.base.on{background:#0e1e30;border-color:var(--blu);color:var(--blu)}
+.bull.on{background:#0e2010;border-color:#66bb6a;color:#66bb6a}
+.sc-desc{font-size:10px;color:#4a4a4a;line-height:1.7;margin-top:10px}
+hr{border:none;border-top:1px solid var(--brd)}
+.assum{font-size:10px;color:#3a3a3a;line-height:1.7}
+.assum b{color:#484848}
+
+.main{display:flex;flex-direction:column;overflow:hidden}
+.tab-bar{display:flex;align-items:center;border-bottom:1px solid var(--brd);flex-shrink:0;padding:0 16px}
+#scale-tog{margin-left:auto;font-size:10px;font-weight:700;letter-spacing:.5px;padding:4px 10px;background:transparent;border:1px solid var(--brd);border-radius:3px;color:#555;cursor:pointer}
+#scale-tog:hover{border-color:#555;color:#aaa}
+#scale-tog.on{border-color:#ffd54f;color:#ffd54f}
+.tab-btn{padding:8px 14px;background:transparent;border:none;border-bottom:2px solid transparent;color:#555;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.6px;margin-bottom:-1px;text-transform:uppercase}
+.tab-btn.on{color:#ddd;border-bottom-color:var(--red)}
+
+#t1{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.chart-area{flex:1;padding:14px 16px 8px;min-height:0;overflow:hidden}
+.chart-wrap{position:relative;width:100%;height:100%}
+.table-area{height:240px;overflow-y:auto;border-top:1px solid var(--brd);padding:0 16px 8px}
+table{width:100%;border-collapse:collapse;font-size:11.5px}
+thead th{padding:8px 10px;text-align:right;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);border-bottom:1px solid var(--brd);position:sticky;top:0;background:var(--bg);z-index:1}
+thead th:first-child{text-align:left}
+tbody td{padding:6px 10px;text-align:right;border-bottom:1px solid #111}
+tbody td:first-child{text-align:left;color:#555;font-weight:600}
+tbody tr:hover{background:#0e0e0e}
+.cb{color:#ef5350}.cbl{color:var(--blu)}.cbu{color:#66bb6a}
+.pv{font-size:9.5px;color:#3a3a3a;margin-top:1px}
+
+#t2{flex:1;display:none;flex-direction:column;overflow:hidden;min-height:0}
+.t2-chart{flex:0 0 280px;padding:12px 16px 4px;position:relative;overflow:hidden}
+.t2-chart canvas{position:absolute;inset:12px 16px 4px}
+.t2-table{flex:1;overflow:auto;padding:0 16px 8px;border-top:1px solid var(--brd)}
+.atbl{width:100%;border-collapse:collapse;font-size:11px}
+.atbl th{padding:6px 10px;text-align:right;font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:var(--mut);border-bottom:1px solid var(--brd);position:sticky;top:0;background:var(--bg);white-space:nowrap;z-index:1}
+.atbl th:first-child{text-align:left;position:sticky;left:0;background:var(--bg);z-index:2}
+.atbl td{padding:5px 10px;text-align:right;border-bottom:1px solid #0e0e0e;white-space:nowrap}
+.atbl td:first-child{text-align:left;position:sticky;left:0;background:var(--bg);font-size:10px;color:#555;z-index:1}
+.atbl tr.grp td{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;padding:8px 10px 3px;border-bottom:none}
+.atbl tr.grp td:first-child{position:sticky;left:0;background:var(--bg)}
+.atbl tr.sp td{height:5px;border:none}
+.c-rt{color:#66bb6a}.c-op{color:#f48fb1}.c-veh{color:#90caf9}.c-oth{color:#ffcc80}.c-ai{color:#ce93d8}.c-sum{color:#ddd}
+.num{font-weight:600}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <h1>TSLA</h1>
+  <div class="hinp"><label>Shares Held</label><input type="number" id="shares" value="550" oninput="render()"></div>
+  <div class="stat"><span class="lbl">Current Portfolio</span><span class="val grn" id="s-port">—</span></div>
+  <div class="stat"><span class="lbl">Baseline 2030</span><span class="val" id="s-b30">—</span></div>
+  <div class="stat"><span class="lbl">Baseline 2035</span><span class="val" id="s-b35">—</span></div>
+  <div class="stat"><span class="lbl">2030 Return</span><span class="val ylw" id="s-ret">—</span></div>
+  <div class="stat"><span class="lbl">Mkt Cap 2030</span><span class="val" id="s-mc30">—</span></div>
+  <div class="pgroup">
+    <div class="hinp"><label>Current Price $</label><input type="number" id="cur" value="400" oninput="render()"></div>
+    <button id="pfetch" onclick="fetchPrice()">↻ Price</button>
+    <span id="ptime"></span>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div>
+      <div class="slbl">Scenario</div>
+      <div class="sc-btns">
+        <button class="btn bear" onclick="loadPreset('bear')">Bear</button>
+        <button class="btn base on" onclick="loadPreset('baseline')">Baseline</button>
+        <button class="btn bull" onclick="loadPreset('bull')">Bull</button>
+      </div>
+      <div class="sc-desc" id="sc-desc"></div>
+    </div>
+    <hr>
+    <div class="assum">
+      <div class="slbl">Model Assumptions</div>
+      <b>Each scenario has distinct assumptions</b> — switch scenarios then open the Assumptions tab.<br><br>
+      <b>Shares:</b> Base 3.8→4.6B (dilution), Bear →5.3B, Bull →3.8B (modest buybacks — 2B scenario not feasible at $20K+ prices).<br><br>
+      <b>P/EBITDA:</b> Base 100×→22×, Bear 80×→18×, Bull 130×→20×.<br><br>
+      <b>Bull</b> is Elon's stated aim: Robotaxi 90% market share, 250M Optimus units, AI chip fab. Path to ~$40K/share.<br><br>
+      <b>Baseline</b> is conservative, Apr 2026 spreadsheet. Update upward as news comes in.
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="tab-bar">
+      <button class="tab-btn on" onclick="switchTab(1)">Valuation</button>
+      <button class="tab-btn" onclick="switchTab(2)">Assumptions</button>
+      <button id="scale-tog" onclick="toggleScale()">Log</button>
+    </div>
+
+    <div id="t1">
+      <div class="chart-area"><div class="chart-wrap"><canvas id="ch"></canvas></div></div>
+      <div class="table-area">
+        <table>
+          <thead><tr>
+            <th>Year</th>
+            <th class="cb">Bear</th>
+            <th class="cbl">Baseline</th>
+            <th class="cbu">Bull</th>
+          </tr></thead>
+          <tbody id="tb"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="t2">
+      <div class="t2-chart"><canvas id="ch2"></canvas></div>
+      <div class="t2-table">
+        <table class="atbl">
+          <thead><tr id="atbl-hdr"></tr></thead>
+          <tbody id="atbl-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const Y=[2026,2027,2028,2029,2030,2031,2032,2033,2034,2035,2036,2037,2038];
+
+const SC={
+  bear:{
+    desc:'Robotaxi ramp delayed 3+ yrs; competition fragments market. Optimus limited to 20M units by 2038. Share dilution continues. ~$450–800/share by 2038.',
+    SO:[3.8,3.9,4.0,4.1,4.2,4.3,4.5,4.7,4.8,5.0,5.1,5.2,5.3],
+    BM:[80,80,80,72,64,56,48,40,22,20,19,18,18],
+    ER:[0.01,0.3,0.8,1.8,5,10,25,35,75,95,110,115,120],
+    EP:[0,0,0,0.02,1.5,2.0,6,9,18,25,38,50,65],
+    EO:[16,18,20,22,24,28,30,28,32,35,36,34,38],
+    AI:[0,0,0,0,0,0,0,0,0,0,0,0,0],
+    RT_UNITS:[0.001,0.02,0.05,0.15,0.7,1.2,2.5,3.5,6,8,9,10,11],
+    RT_ASP:[40,40,40,40,35,35,35,35,35,35,35,35,35],
+    RT_GM:[70,70,70,70,65,65,65,65,60,60,60,60,60],
+    OP_UNITS:[0,0,0,0.005,0.3,0.4,1.5,2.5,5,7,10,15,20],
+    OP_ASP:[0,0,0,40,40,35,35,35,35,35,35,35,35],
+    OP_GM:[40,40,40,15,20,25,25,25,25,25,25,25,25],
+    VEH_UNITS:[1.5,1.7,2.1,2.4,2.8,3.5,3.8,4.0,4.4,4.8,5.0,5.3,5.1],
+    EV:[10.5,12.5,16,18,19,25,26,22,24,27,28,29,27],
+  },
+  baseline:{
+    desc:'Apr 2026 spreadsheet estimates. Conservative and sandbagged — 18M Robotaxis, 30M Optimus units by 2038. Designed to update upward as visibility improves.',
+    SO:[3.8,3.9,4.0,4.1,4.2,4.3,4.4,4.5,4.5,4.55,4.6,4.6,4.6],
+    BM:[100,100,100,90,80,70,60,50,28,25,24,23,22],
+    ER:[0.02,1.12,2.24,6.72,27.56,36.75,73.50,91.88,294.00,315.00,312.00,331.50,351.00],
+    EP:[0.00,0.00,0.00,0.06,7.50,7.88,31.50,47.25,78.75,94.50,141.75,204.75,236.25],
+    EO:[17.20,21.44,26.65,31.09,34.91,45.51,46.76,42.82,53.58,60.26,61.65,55.28,64.35],
+    AI:[0,0,0,0,0,0,0,0,0,0,0,0,0],
+    RT_UNITS:[0.001,0.05,0.10,0.30,1.50,2.00,4.00,5.00,14.0,15.0,16.0,17.0,18.0],
+    RT_ASP:[40,40,40,40,35,35,35,35,40,40,40,40,40],
+    RT_GM:[70,70,70,70,70,70,70,70,70,70,65,65,65],
+    OP_UNITS:[0,0,0,0.01,1.00,1.00,4.00,6.00,10.0,12.0,18.0,26.0,30.0],
+    OP_ASP:[0,0,0,40,40,35,35,35,35,35,35,35,35],
+    OP_GM:[40,40,40,20,25,30,30,30,30,30,30,30,30],
+    VEH_UNITS:[1.55,1.86,2.47,2.91,3.44,4.35,4.65,5.00,5.50,5.86,6.26,6.66,6.46],
+    EV:[11.52,14.52,19.25,22.65,25.46,33.81,34.65,29.02,31.61,33.60,35.18,37.20,36.30],
+  },
+  bull:{
+    desc:'Tesla 90% Robotaxi share → $750B EBITDA by 2038. 250M Optimus units → $1T EBITDA. AI chips + Energy → $600B. Buybacks to 2B shares by 2038. MC stays below $40T until 2035.',
+    SO:[3.8,3.9,4.0,4.1,4.2,4.3,4.4,4.5,4.2,3.5,2.8,2.2,2.0],
+    BM:[130,130,130,120,110,85,68,51,32,25,21,19,19],
+    ER:[0.05,2,8,25,80,150,175,250,450,600,700,750,750],
+    EP:[0,0,0.5,8,40,80,100,175,350,550,800,950,1000],
+    EO:[22,35,55,85,140,200,280,340,420,500,540,570,600],
+    AI:[0,0,0,5,30,60,90,120,160,200,230,250,270],
+    RT_UNITS:[0.001,0.1,0.3,1.0,4,8,18,28,45,65,75,80,85],
+    RT_ASP:[40,40,40,40,35,35,35,35,40,40,40,40,40],
+    RT_GM:[70,70,70,70,70,70,70,70,70,70,70,70,70],
+    OP_UNITS:[0,0,0.05,0.5,3,6,18,30,60,100,150,200,250],
+    OP_ASP:[0,0,20,20,20,18,15,15,15,15,15,15,15],
+    OP_GM:[40,40,50,50,50,55,55,55,55,55,55,55,55],
+    VEH_UNITS:[1.6,2.0,2.7,3.2,3.8,4.8,5.2,5.6,6.2,6.6,7.0,7.4,7.2],
+    EV:[13,16,22,26,30,38,40,32,36,38,40,42,40],
+  }
+};
+
+let activeScenario='baseline';
+
+function getN(){return parseFloat(document.getElementById('shares').value)||550;}
+
+function compute(sName){
+  const s=SC[sName];
+  return Y.map((yr,i)=>{
+    const e=s.EO[i]+s.ER[i]+s.EP[i];
+    const m=s.BM[i];
+    const mc=e*m;
+    const p=mc/s.SO[i];
+    return{yr,p,v:p*getN(),e,m,mc};
+  });
+}
+
+function fp(n){return'$'+Math.round(n).toLocaleString();}
+function fv(n){return n>=1e6?'$'+(n/1e6).toFixed(2)+'M':'$'+Math.round(n/1000)+'K';}
+function fmc(b){return b>=1000?'$'+(b/1000).toFixed(1)+'T':'$'+Math.round(b)+'B';}
+function fu(n){return n===0?'—':n<0.1?n.toFixed(3)+'M':n<1?n.toFixed(2)+'M':n.toFixed(1)+'M';}
+function fe(n){return n===0?'—':n<1?n.toFixed(2):n<10?n.toFixed(1):Math.round(n)+'';}
+
+let chart1=null,chart2=null,logScale=false;
+
+function render(){
+  const curP=parseFloat(document.getElementById('cur').value)||0;
+  const N=getN();
+  const sc={
+    bear:compute('bear'),
+    base:compute('baseline'),
+    bull:compute('bull')
+  };
+
+  if(curP){
+    document.getElementById('s-port').textContent=fv(curP*N);
+    const b30=sc.base.find(d=>d.yr===2030);
+    document.getElementById('s-ret').textContent=b30?'×'+(b30.p/curP).toFixed(1):'—';
+  }
+  const b30=sc.base.find(d=>d.yr===2030),b35=sc.base.find(d=>d.yr===2035);
+  document.getElementById('s-b30').textContent=b30?fp(b30.p):'—';
+  document.getElementById('s-b35').textContent=b35?fp(b35.p):'—';
+  document.getElementById('s-mc30').textContent=b30?fmc(b30.mc):'—';
+  document.getElementById('sc-desc').textContent=SC[activeScenario].desc;
+
+  const prices=s=>s.map(d=>d.p);
+  const ds=[
+    {label:'Bear',    data:prices(sc.bear),borderColor:'#ef5350',tension:.4,pointRadius:2,borderWidth:1.5,fill:false},
+    {label:'Baseline',data:prices(sc.base),borderColor:'#64b5f6',tension:.4,pointRadius:2,borderWidth:2,  fill:false},
+    {label:'Bull',    data:prices(sc.bull),borderColor:'#66bb6a',tension:.4,pointRadius:2,borderWidth:1.5,fill:false},
+  ];
+  if(curP) ds.unshift({label:'Today',data:Y.map(()=>curP),borderColor:'rgba(255,255,255,.15)',tension:0,pointRadius:0,borderWidth:1,borderDash:[2,4],fill:false});
+
+  const opts={
+    responsive:true,maintainAspectRatio:false,animation:{duration:250},
+    plugins:{
+      legend:{labels:{color:'#555',font:{size:11},boxWidth:14,padding:14}},
+      tooltip:{callbacks:{label:ctx=>{
+        if(ctx.dataset.label==='Today') return` Today: ${fp(ctx.raw)}`;
+        const key={Bear:'bear',Baseline:'base',Bull:'bull'}[ctx.dataset.label];
+        const row=sc[key]?.find(d=>d.yr===Y[ctx.dataIndex]);
+        return` ${ctx.dataset.label}: ${fp(ctx.raw)} | Portfolio: ${fv(ctx.raw*N)}${row?' | Mkt Cap: '+fmc(row.mc):''}`;
+      }}}
+    },
+    scales:{
+      x:{ticks:{color:'#444',font:{size:11}},grid:{color:'#161616'}},
+      y:{type:logScale?'logarithmic':'linear',ticks:{color:'#444',font:{size:11},callback:v=>v>=1000?'$'+(v/1000).toFixed(0)+'K':'$'+v},grid:{color:'#161616'}}
+    }
+  };
+  if(chart1&&chart1.options.scales.y.type===(logScale?'logarithmic':'linear')){
+    chart1.data={labels:Y,datasets:ds};chart1.update('none');
+  } else {
+    if(chart1){chart1.destroy();chart1=null;}
+    chart1=new Chart(document.getElementById('ch'),{type:'line',data:{labels:Y,datasets:ds},options:opts});
+  }
+
+  document.getElementById('tb').innerHTML=Y.map(yr=>{
+    const cell=(d,c)=>d?`<td class="${c}"><div>${fp(d.p)}</div><div class="pv">${fv(d.v)} · ${fmc(d.mc)}</div></td>`:'<td>—</td>';
+    return`<tr><td>${yr}</td>${cell(sc.bear.find(d=>d.yr===yr),'cb')}${cell(sc.base.find(d=>d.yr===yr),'cbl')}${cell(sc.bull.find(d=>d.yr===yr),'cbu')}</tr>`;
+  }).join('');
+}
+
+function renderTab2(){
+  const s=SC[activeScenario];
+  const EOTH=s.EO.map((v,i)=>Math.max(0,+(v-s.EV[i]-s.AI[i]).toFixed(2)));
+
+  const datasets=[
+    {label:'Vehicles',        data:s.EV,  backgroundColor:'#1565c0',stack:'e'},
+    {label:'Energy/Svcs/FSD', data:EOTH,  backgroundColor:'#ef6c00',stack:'e'},
+    {label:'AI Chips',        data:s.AI,  backgroundColor:'#7b1fa2',stack:'e'},
+    {label:'Robotaxi',        data:s.ER,  backgroundColor:'#2e7d32',stack:'e'},
+    {label:'Optimus',         data:s.EP,  backgroundColor:'#880e4f',stack:'e'},
+  ];
+
+  if(chart2){
+    chart2.data.datasets=datasets;
+    chart2.update('none');
+  } else {
+    chart2=new Chart(document.getElementById('ch2'),{
+      type:'bar',
+      data:{labels:Y,datasets},
+      options:{
+        responsive:true,maintainAspectRatio:false,animation:{duration:300},
+        plugins:{
+          legend:{labels:{color:'#666',font:{size:11},boxWidth:12,padding:14}},
+          tooltip:{callbacks:{label:ctx=>` ${ctx.dataset.label}: $${fe(ctx.raw)}B EBITDA`}}
+        },
+        scales:{
+          x:{stacked:true,ticks:{color:'#444',font:{size:11}},grid:{color:'#161616'}},
+          y:{stacked:true,ticks:{color:'#444',font:{size:11},callback:v=>'$'+v+'B'},grid:{color:'#161616'},title:{display:true,text:'EBITDA ($B)',color:'#444',font:{size:10}}}
+        }
+      }
+    });
+  }
+
+  const scLabel={bear:'Bear',baseline:'Baseline',bull:'Bull'}[activeScenario];
+  document.getElementById('atbl-hdr').innerHTML=`<th>Metric · ${scLabel}</th>`+Y.map(y=>`<th>${y}</th>`).join('');
+
+  const rows=[
+    {label:'ROBOTAXI',cls:'grp c-rt',vals:null},
+    {label:'Units (M)',    cls:'c-rt',    vals:Y.map((_,i)=>fu(s.RT_UNITS[i]))},
+    {label:'ASP ($K)',     cls:'c-rt',    vals:Y.map((_,i)=>s.RT_ASP[i]?'$'+s.RT_ASP[i]+'K':'—')},
+    {label:'Gross Margin', cls:'c-rt',    vals:Y.map((_,i)=>s.RT_GM[i]+'%')},
+    {label:'EBITDA ($B)',  cls:'c-rt num',vals:Y.map((_,i)=>'$'+fe(s.ER[i])+'B')},
+    {label:'',cls:'sp',vals:null},
+    {label:'OPTIMUS',cls:'grp c-op',vals:null},
+    {label:'Units (M)',    cls:'c-op',    vals:Y.map((_,i)=>fu(s.OP_UNITS[i]))},
+    {label:'ASP ($K)',     cls:'c-op',    vals:Y.map((_,i)=>s.OP_ASP[i]?'$'+s.OP_ASP[i]+'K':'—')},
+    {label:'Gross Margin', cls:'c-op',    vals:Y.map((_,i)=>s.OP_GM[i]?s.OP_GM[i]+'%':'—')},
+    {label:'EBITDA ($B)',  cls:'c-op num',vals:Y.map((_,i)=>'$'+fe(s.EP[i])+'B')},
+    {label:'',cls:'sp',vals:null},
+    {label:'VEHICLES  (M3 / MY / CT / Semi / Roadster)',cls:'grp c-veh',vals:null},
+    {label:'Total Units (M)',cls:'c-veh',    vals:Y.map((_,i)=>s.VEH_UNITS[i].toFixed(2)+'M')},
+    {label:'EBITDA ($B)',   cls:'c-veh num',vals:Y.map((_,i)=>'$'+fe(s.EV[i])+'B')},
+    {label:'',cls:'sp',vals:null},
+    {label:'AI CHIPS & DATA CENTERS',cls:'grp c-ai',vals:null},
+    {label:'EBITDA ($B)',   cls:'c-ai num',vals:Y.map((_,i)=>s.AI[i]?'$'+fe(s.AI[i])+'B':'—')},
+    {label:'',cls:'sp',vals:null},
+    {label:'ENERGY + SERVICES + FSD + TERAFAB',cls:'grp c-oth',vals:null},
+    {label:'EBITDA ($B)',   cls:'c-oth num',vals:Y.map((_,i)=>'$'+fe(EOTH[i])+'B')},
+    {label:'',cls:'sp',vals:null},
+    {label:`SUMMARY  (${scLabel})`,cls:'grp c-sum',vals:null},
+    {label:'Total EBITDA ($B)',cls:'c-sum num',vals:Y.map((_,i)=>'$'+fe(s.EO[i]+s.ER[i]+s.EP[i])+'B')},
+    {label:'P/EBITDA',        cls:'c-sum',   vals:Y.map((_,i)=>s.BM[i]+'×')},
+    {label:'Shares Out (B)',  cls:'c-sum',   vals:Y.map((_,i)=>s.SO[i]+'B')},
+    {label:'Market Cap',      cls:'c-sum num',vals:Y.map((_,i)=>fmc((s.EO[i]+s.ER[i]+s.EP[i])*s.BM[i]))},
+    {label:'Share Price',     cls:'c-sum num',vals:Y.map((_,i)=>fp((s.EO[i]+s.ER[i]+s.EP[i])*s.BM[i]/s.SO[i]))},
+  ];
+
+  document.getElementById('atbl-body').innerHTML=rows.map(r=>{
+    if(r.cls==='sp') return`<tr class="sp"><td colspan="${Y.length+1}"></td></tr>`;
+    if(r.cls.includes('grp')) return`<tr class="grp"><td class="${r.cls}" colspan="${Y.length+1}">${r.label}</td></tr>`;
+    return`<tr><td class="${r.cls}">${r.label}</td>${r.vals.map(v=>`<td class="${r.cls}">${v}</td>`).join('')}</tr>`;
+  }).join('');
+}
+
+function switchTab(t){
+  document.getElementById('t1').style.display=t===1?'flex':'none';
+  document.getElementById('t2').style.display=t===2?'flex':'none';
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('on',i===t-1));
+  if(t===2) setTimeout(renderTab2,30);
+}
+
+function loadPreset(name){
+  activeScenario=name;
+  document.querySelectorAll('.sc-btns .btn').forEach(b=>b.classList.remove('on'));
+  document.querySelector('.btn.'+{bear:'bear',baseline:'base',bull:'bull'}[name]).classList.add('on');
+  render();
+  const t2=document.getElementById('t2');
+  if(t2.style.display!=='none') renderTab2();
+}
+
+function toggleScale(){
+  logScale=!logScale;
+  const btn=document.getElementById('scale-tog');
+  btn.textContent=logScale?'Linear':'Log';
+  btn.classList.toggle('on',logScale);
+  if(chart1){chart1.destroy();chart1=null;}
+  render();
+}
+
+async function fetchPrice(){
+  const btn=document.getElementById('pfetch'),ts=document.getElementById('ptime');
+  btn.textContent='…';ts.textContent='';
+  try{
+    const url='https://query1.finance.yahoo.com/v8/finance/chart/TSLA?interval=1d&range=1d';
+    const r=await fetch('https://corsproxy.io/?'+encodeURIComponent(url));
+    const d=await r.json();
+    const p=d?.chart?.result?.[0]?.meta?.regularMarketPrice;
+    if(p){
+      document.getElementById('cur').value=p.toFixed(2);
+      ts.textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+      render();
+    } else ts.textContent='n/a';
+  }catch(e){ts.textContent='error';}
+  btn.textContent='↻ Price';
+}
+
+render();
+fetchPrice();
+</script>
+</body>
+</html>
