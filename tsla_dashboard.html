@@ -284,7 +284,7 @@ function renderTab2(){
   const datasets=[
     {label:'Vehicles',        data:s.EV,  backgroundColor:'#1565c0',stack:'e'},
     {label:'Energy/Svcs/FSD', data:EOTH,  backgroundColor:'#ef6c00',stack:'e'},
-    {label:'AI Chips',        data:s.AI,  backgroundColor:'#7b1fa2',stack:'e'},
+    {label:'AI/Terafab',      data:s.AI,  backgroundColor:'#7b1fa2',stack:'e'},
     {label:'Robotaxi',        data:s.ER,  backgroundColor:'#2e7d32',stack:'e'},
     {label:'Optimus',         data:s.EP,  backgroundColor:'#880e4f',stack:'e'},
   ];
@@ -330,10 +330,10 @@ function renderTab2(){
     {label:'Total Units (M)',cls:'c-veh',    vals:Y.map((_,i)=>s.VEH_UNITS[i].toFixed(2)+'M')},
     {label:'EBITDA ($B)',   cls:'c-veh num',vals:Y.map((_,i)=>'$'+fe(s.EV[i])+'B')},
     {label:'',cls:'sp',vals:null},
-    {label:'AI CHIPS & DATA CENTERS',cls:'grp c-ai',vals:null},
+    {label:'AI CHIPS, DATA CENTERS & TERAFAB',cls:'grp c-ai',vals:null},
     {label:'EBITDA ($B)',   cls:'c-ai num',vals:Y.map((_,i)=>s.AI[i]?'$'+fe(s.AI[i])+'B':'—')},
     {label:'',cls:'sp',vals:null},
-    {label:'ENERGY + SERVICES + FSD + TERAFAB',cls:'grp c-oth',vals:null},
+    {label:'ENERGY + SERVICES + FSD',cls:'grp c-oth',vals:null},
     {label:'EBITDA ($B)',   cls:'c-oth num',vals:Y.map((_,i)=>'$'+fe(EOTH[i])+'B')},
     {label:'',cls:'sp',vals:null},
     {label:`SUMMARY  (${scLabel})`,cls:'grp c-sum',vals:null},
