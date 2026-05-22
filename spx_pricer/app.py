@@ -80,12 +80,24 @@ def index():
 
 @app.route("/api/spx")
 def get_spx():
-    try:
-        ticker = yf.Ticker("^GSPC")
-        price = ticker.fast_info.last_price
-        return jsonify({"price": round(float(price), 2), "status": "live"})
-    except Exception as e:
-        return jsonify({"price": 5300.00, "status": "fallback", "error": str(e)})
+    result = {}
+    errors = []
+
+    for symbol, key, fallback in [
+        ("SPY",  "price", 530.00),  # SPY spot — used as underlying
+        ("^IRX", "rate",  4.30),    # 13-week T-bill annualized yield, already in %
+        ("^VIX", "vix",  15.00),    # 30-day ATM implied vol, already in %
+    ]:
+        try:
+            result[key] = round(float(yf.Ticker(symbol).fast_info.last_price), 2)
+        except Exception as e:
+            result[key] = fallback
+            errors.append(f"{symbol}: {e}")
+
+    result["status"] = "fallback" if errors else "live"
+    if errors:
+        result["errors"] = errors
+    return jsonify(result)
 
 
 @app.route("/api/price", methods=["POST"])

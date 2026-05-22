@@ -35,6 +35,10 @@
     .spx-live {
       text-align: center;
       margin-bottom: 32px;
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
     }
 
     .spx-badge {
@@ -50,6 +54,7 @@
 
     .spx-label { color: #6e7681; font-size: 0.8rem; }
     .spx-value { font-size: 1.4rem; color: #58a6ff; font-weight: bold; }
+    .spx-value.small { font-size: 1.1rem; }
     .spx-status {
       font-size: 0.7rem;
       padding: 2px 8px;
@@ -353,14 +358,22 @@
 <body>
 
 <div class="container">
-  <h1>SPX Options Pricer</h1>
-  <p class="subtitle">Black-Scholes · European-style · S&amp;P 500 Index</p>
+  <h1>SPY Options Pricer</h1>
+  <p class="subtitle">Black-Scholes · S&amp;P 500 ETF · American-style approximation</p>
 
   <div class="spx-live">
     <div class="spx-badge">
-      <span class="spx-label">^GSPC</span>
+      <span class="spx-label">SPY</span>
       <span class="spx-value" id="spx-price">—</span>
       <span class="spx-status" id="spx-status">loading</span>
+    </div>
+    <div class="spx-badge">
+      <span class="spx-label">^VIX</span>
+      <span class="spx-value small" id="spx-vix">—</span>
+    </div>
+    <div class="spx-badge">
+      <span class="spx-label">3M T-Bill</span>
+      <span class="spx-value small" id="spx-rate">—</span>
     </div>
   </div>
 
@@ -378,12 +391,12 @@
 
       <div class="form-group">
         <label>Spot (S)</label>
-        <input type="number" id="spot" step="1" placeholder="5300" />
+        <input type="number" id="spot" step="0.01" placeholder="530" />
       </div>
 
       <div class="form-group">
         <label>Strike (K)</label>
-        <input type="number" id="strike" step="1" placeholder="5300" />
+        <input type="number" id="strike" step="0.01" placeholder="530" />
       </div>
 
       <div class="form-group">
@@ -392,13 +405,13 @@
       </div>
 
       <div class="form-group">
-        <label>Risk-Free Rate (%)</label>
-        <input type="number" id="rate" step="0.01" value="4.30" placeholder="4.30" />
+        <label>Risk-Free Rate (%) <span id="rate-source" style="color:#3fb950;font-size:0.7rem;text-transform:none;letter-spacing:0"></span></label>
+        <input type="number" id="rate" step="0.01" placeholder="loading..." />
       </div>
 
       <div class="form-group">
-        <label>Implied Vol (%)</label>
-        <input type="number" id="vol" step="0.1" value="15" placeholder="15" />
+        <label>Implied Vol (%) <span id="vol-source" style="color:#3fb950;font-size:0.7rem;text-transform:none;letter-spacing:0"></span></label>
+        <input type="number" id="vol" step="0.1" placeholder="loading..." />
       </div>
     </div>
 
@@ -577,15 +590,29 @@
     try {
       const res = await fetch('/api/spx');
       const data = await res.json();
-      document.getElementById('spx-price').textContent = '$' + data.price.toLocaleString('en-US', {minimumFractionDigits: 2});
-      const statusEl = document.getElementById('spx-status');
-      statusEl.textContent = data.status === 'live' ? '● LIVE' : '○ fallback';
-      if (data.status !== 'live') statusEl.classList.add('fallback');
+      const live = data.status === 'live';
 
-      // Pre-fill spot
+      document.getElementById('spx-price').textContent = '$' + data.price.toLocaleString('en-US', {minimumFractionDigits: 2});
+      document.getElementById('spx-vix').textContent   = data.vix.toFixed(2) + '%';
+      document.getElementById('spx-rate').textContent  = data.rate.toFixed(2) + '%';
+
+      const statusEl = document.getElementById('spx-status');
+      statusEl.textContent = live ? '● LIVE' : '○ fallback';
+      if (!live) statusEl.classList.add('fallback');
+
+      const tag = live ? '↑ live' : '↑ fallback';
+      document.getElementById('rate-source').textContent = tag;
+      document.getElementById('vol-source').textContent  = tag + ' (^VIX)';
+
       if (!document.getElementById('spot').value) {
-        document.getElementById('spot').value = data.price;
-        document.getElementById('strike').value = Math.round(data.price / 10) * 10;
+        document.getElementById('spot').value  = data.price;
+        document.getElementById('strike').value = Math.round(data.price);
+      }
+      if (!document.getElementById('rate').value) {
+        document.getElementById('rate').value = data.rate.toFixed(2);
+      }
+      if (!document.getElementById('vol').value) {
+        document.getElementById('vol').value = data.vix.toFixed(2);
       }
     } catch (e) {
       document.getElementById('spx-status').textContent = 'error';
