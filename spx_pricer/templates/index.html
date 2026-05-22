@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SPX Options Pricer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Georgia', serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+      padding: 40px 20px 80px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.8rem;
+      font-weight: normal;
+      letter-spacing: 0.08em;
+      color: #c9d1d9;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #6e7681;
+      margin-bottom: 36px;
+      font-family: 'Courier New', monospace;
+    }
+
+    .spx-live {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .spx-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-family: 'Courier New', monospace;
+    }
+
+    .spx-label { color: #6e7681; font-size: 0.8rem; }
+    .spx-value { font-size: 1.4rem; color: #58a6ff; font-weight: bold; }
+    .spx-status {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: #1f2d1f;
+      color: #3fb950;
+      border: 1px solid #238636;
+    }
+    .spx-status.fallback {
+      background: #2d1f1f;
+      color: #f85149;
+      border-color: #da3633;
+    }
+
+    .container {
+      max-width: 820px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+
+    .card h2 {
+      font-size: 0.85rem;
+      font-family: 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #6e7681;
+      margin-bottom: 22px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #21262d;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+
+    label {
+      font-size: 0.75rem;
+      color: #8b949e;
+      font-family: 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    input, select {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      padding: 9px 12px;
+      font-size: 0.95rem;
+      font-family: 'Courier New', monospace;
+      transition: border-color 0.15s;
+      width: 100%;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: #58a6ff;
+    }
+
+    select option { background: #0d1117; }
+
+    .type-toggle {
+      display: flex;
+      gap: 0;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .type-toggle button {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #6e7681;
+      padding: 9px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .type-toggle button.active.call { background: #1f3a5c; color: #58a6ff; }
+    .type-toggle button.active.put  { background: #3a1f1f; color: #f85149; }
+
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .btn {
+      padding: 11px 24px;
+      border: none;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .btn:hover { opacity: 0.85; }
+
+    .btn-primary { background: #238636; color: #fff; }
+    .btn-secondary { background: #21262d; color: #8b949e; border: 1px solid #30363d; }
+
+    /* Results */
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .result-box {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 18px;
+      text-align: center;
+    }
+
+    .result-box.featured {
+      border-color: #238636;
+      background: #0f1e0f;
+    }
+
+    .result-box.featured.put-featured {
+      border-color: #da3633;
+      background: #1e0f0f;
+    }
+
+    .result-label {
+      font-size: 0.7rem;
+      color: #6e7681;
+      font-family: 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 6px;
+    }
+
+    .result-value {
+      font-size: 2rem;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      color: #3fb950;
+    }
+
+    .result-value.put { color: #f85149; }
+    .result-value.neutral { color: #e6edf3; font-size: 1.2rem; }
+    .result-sub { font-size: 0.75rem; color: #6e7681; margin-top: 4px; }
+
+    .greeks-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .greek-box {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      padding: 14px 10px;
+      text-align: center;
+    }
+
+    .greek-symbol {
+      font-size: 1.1rem;
+      font-style: italic;
+      color: #58a6ff;
+      margin-bottom: 4px;
+    }
+
+    .greek-value {
+      font-family: 'Courier New', monospace;
+      font-size: 0.95rem;
+      color: #e6edf3;
+    }
+
+    .greek-name {
+      font-size: 0.65rem;
+      color: #6e7681;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-top: 3px;
+    }
+
+    .moneyness-badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 10px;
+      font-size: 0.75rem;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+    }
+
+    .ITM { background: #1f3a1f; color: #3fb950; border: 1px solid #238636; }
+    .OTM { background: #2d2d1f; color: #e3b341; border: 1px solid #9e6a03; }
+    .ATM { background: #1f2d3a; color: #58a6ff; border: 1px solid #1f6feb; }
+
+    #error-msg {
+      background: #2d1f1f;
+      border: 1px solid #da3633;
+      border-radius: 6px;
+      color: #f85149;
+      padding: 10px 14px;
+      font-size: 0.85rem;
+      font-family: 'Courier New', monospace;
+      margin-top: 12px;
+      display: none;
+    }
+
+    /* Methodology */
+    .method-section { margin-bottom: 20px; }
+
+    .method-section h3 {
+      font-size: 0.85rem;
+      color: #58a6ff;
+      font-family: 'Courier New', monospace;
+      margin-bottom: 10px;
+    }
+
+    .method-section p, .method-section li {
+      font-size: 0.88rem;
+      color: #8b949e;
+      line-height: 1.7;
+    }
+
+    .method-section ul { padding-left: 20px; }
+    .method-section li { margin-bottom: 4px; }
+
+    .formula-block {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      padding: 14px 18px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.82rem;
+      color: #c9d1d9;
+      line-height: 1.9;
+      margin: 10px 0;
+    }
+
+    .formula-block .var { color: #58a6ff; }
+    .formula-block .op  { color: #e3b341; }
+
+    .assumptions-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .assumption-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 0.83rem;
+      color: #8b949e;
+      line-height: 1.5;
+    }
+
+    .assumption-item .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #30363d;
+      margin-top: 6px;
+      flex-shrink: 0;
+    }
+
+    .hidden { display: none; }
+
+    .iv-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .iv-row input { flex: 1; }
+
+    @media (max-width: 600px) {
+      .form-grid { grid-template-columns: 1fr 1fr; }
+      .greeks-grid { grid-template-columns: repeat(3, 1fr); }
+      .results-grid { grid-template-columns: 1fr; }
+      .assumptions-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>SPX Options Pricer</h1>
+  <p class="subtitle">Black-Scholes · European-style · S&amp;P 500 Index</p>
+
+  <div class="spx-live">
+    <div class="spx-badge">
+      <span class="spx-label">^GSPC</span>
+      <span class="spx-value" id="spx-price">—</span>
+      <span class="spx-status" id="spx-status">loading</span>
+    </div>
+  </div>
+
+  <!-- Inputs -->
+  <div class="card">
+    <h2>Parameters</h2>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Option Type</label>
+        <div class="type-toggle">
+          <button id="btn-call" class="active call" onclick="setType('call')">Call</button>
+          <button id="btn-put" class="put" onclick="setType('put')">Put</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Spot (S)</label>
+        <input type="number" id="spot" step="1" placeholder="5300" />
+      </div>
+
+      <div class="form-group">
+        <label>Strike (K)</label>
+        <input type="number" id="strike" step="1" placeholder="5300" />
+      </div>
+
+      <div class="form-group">
+        <label>Expiry Date</label>
+        <input type="date" id="expiry" />
+      </div>
+
+      <div class="form-group">
+        <label>Risk-Free Rate (%)</label>
+        <input type="number" id="rate" step="0.01" value="4.30" placeholder="4.30" />
+      </div>
+
+      <div class="form-group">
+        <label>Implied Vol (%)</label>
+        <input type="number" id="vol" step="0.1" value="15" placeholder="15" />
+      </div>
+    </div>
+
+    <div class="form-grid" style="margin-top:16px;">
+      <div class="form-group" style="grid-column: span 3;">
+        <label>Market Price (optional — back out IV)</label>
+        <input type="number" id="market_price" step="0.01" placeholder="Leave blank to use vol above" />
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="priceOption()">Price Option</button>
+      <button class="btn btn-secondary" onclick="reset()">Reset</button>
+    </div>
+
+    <div id="error-msg"></div>
+  </div>
+
+  <!-- Results -->
+  <div class="card hidden" id="results-card">
+    <h2>Results</h2>
+    <div class="results-grid">
+      <div class="result-box featured" id="price-box">
+        <div class="result-label">Theoretical Price</div>
+        <div class="result-value" id="res-price">—</div>
+        <div class="result-sub" id="res-moneyness">—</div>
+      </div>
+
+      <div class="result-box">
+        <div class="result-label">Days to Expiry</div>
+        <div class="result-value neutral" id="res-dte">—</div>
+        <div class="result-sub">calendar days</div>
+      </div>
+
+      <div class="result-box" id="iv-box" style="display:none">
+        <div class="result-label">Implied Volatility</div>
+        <div class="result-value neutral" id="res-iv">—</div>
+        <div class="result-sub">from market price</div>
+      </div>
+
+      <div class="result-box" id="pct-box">
+        <div class="result-label">Strike vs Spot</div>
+        <div class="result-value neutral" id="res-pct">—</div>
+        <div class="result-sub">% difference</div>
+      </div>
+    </div>
+
+    <h2 style="margin-top:24px;">Greeks</h2>
+    <div class="greeks-grid">
+      <div class="greek-box">
+        <div class="greek-symbol">Δ</div>
+        <div class="greek-value" id="g-delta">—</div>
+        <div class="greek-name">Delta</div>
+      </div>
+      <div class="greek-box">
+        <div class="greek-symbol">Γ</div>
+        <div class="greek-value" id="g-gamma">—</div>
+        <div class="greek-name">Gamma</div>
+      </div>
+      <div class="greek-box">
+        <div class="greek-symbol">Θ</div>
+        <div class="greek-value" id="g-theta">—</div>
+        <div class="greek-name">Theta / day</div>
+      </div>
+      <div class="greek-box">
+        <div class="greek-symbol">ν</div>
+        <div class="greek-value" id="g-vega">—</div>
+        <div class="greek-name">Vega / 1% σ</div>
+      </div>
+      <div class="greek-box">
+        <div class="greek-symbol">ρ</div>
+        <div class="greek-value" id="g-rho">—</div>
+        <div class="greek-name">Rho / 1% r</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Methodology -->
+  <div class="card">
+    <h2>Methodology</h2>
+
+    <div class="method-section">
+      <h3>Model: Black-Scholes (1973)</h3>
+      <p>
+        This pricer uses the Black-Scholes-Merton framework, the standard closed-form model
+        for European-style options. SPX options are European — they can only be exercised at expiration —
+        making Black-Scholes the appropriate baseline model.
+      </p>
+    </div>
+
+    <div class="method-section">
+      <h3>Pricing Formulas</h3>
+      <div class="formula-block">
+        <span class="var">d₁</span> <span class="op">=</span> [ ln(<span class="var">S</span>/<span class="var">K</span>) + (<span class="var">r</span> + σ²/2)·<span class="var">T</span> ] / ( σ·√<span class="var">T</span> )<br>
+        <span class="var">d₂</span> <span class="op">=</span> <span class="var">d₁</span> − σ·√<span class="var">T</span><br><br>
+        <span class="op">Call</span> = <span class="var">S</span>·N(<span class="var">d₁</span>) − <span class="var">K</span>·e<sup>−r·T</sup>·N(<span class="var">d₂</span>)<br>
+        <span class="op">Put</span>  = <span class="var">K</span>·e<sup>−r·T</sup>·N(−<span class="var">d₂</span>) − <span class="var">S</span>·N(−<span class="var">d₁</span>)
+      </div>
+      <p style="margin-top:8px;">
+        Where <strong style="color:#c9d1d9">N(·)</strong> is the standard normal CDF,
+        <strong style="color:#c9d1d9">S</strong> = spot price,
+        <strong style="color:#c9d1d9">K</strong> = strike,
+        <strong style="color:#c9d1d9">r</strong> = risk-free rate,
+        <strong style="color:#c9d1d9">σ</strong> = volatility,
+        <strong style="color:#c9d1d9">T</strong> = time to expiry in years.
+      </p>
+    </div>
+
+    <div class="method-section">
+      <h3>Greeks</h3>
+      <div class="formula-block">
+        <span class="var">Δ</span> (Delta)  = ∂V/∂S   → option price sensitivity to $1 move in spot<br>
+        <span class="var">Γ</span> (Gamma)  = ∂²V/∂S² → rate of change of delta per $1 move<br>
+        <span class="var">Θ</span> (Theta)  = ∂V/∂t   → daily time decay (shown per calendar day)<br>
+        <span class="var">ν</span> (Vega)   = ∂V/∂σ   → P&amp;L per 1% increase in implied vol<br>
+        <span class="var">ρ</span> (Rho)    = ∂V/∂r   → P&amp;L per 1% increase in risk-free rate
+      </div>
+    </div>
+
+    <div class="method-section">
+      <h3>Implied Volatility</h3>
+      <p>
+        Black-Scholes has no closed-form inverse for σ. When a market price is provided,
+        this pricer uses <strong style="color:#c9d1d9">Brent's method</strong> — a root-finding
+        algorithm that brackets the solution and converges to the IV that equates the
+        model price to the observed market price. Convergence is typically achieved in under 50 iterations.
+      </p>
+    </div>
+
+    <div class="method-section">
+      <h3>Model Assumptions &amp; Limitations</h3>
+      <div class="assumptions-grid">
+        <div class="assumption-item"><div class="dot"></div><span>Continuous log-normal returns (no jumps)</span></div>
+        <div class="assumption-item"><div class="dot"></div><span>Constant volatility over option life</span></div>
+        <div class="assumption-item"><div class="dot"></div><span>Constant risk-free rate</span></div>
+        <div class="assumption-item"><div class="dot"></div><span>No transaction costs or taxes</span></div>
+        <div class="assumption-item"><div class="dot"></div><span>SPX pays a continuous dividend yield (not modeled here — use Black-76 or Merton extension for accuracy)</span></div>
+        <div class="assumption-item"><div class="dot"></div><span>Real markets exhibit volatility skew — Black-Scholes uses a flat vol surface</span></div>
+        <div class="assumption-item"><div class="dot"></div><span>Fat tails and vol clustering are not captured</span></div>
+        <div class="assumption-item"><div class="dot"></div><span>European exercise only — correct for SPX (not SPY)</span></div>
+      </div>
+    </div>
+
+    <div class="method-section">
+      <h3>Data Source</h3>
+      <p>
+        Spot price pulled live from Yahoo Finance (<code style="color:#58a6ff;font-size:0.82rem">^GSPC</code>) via the
+        <code style="color:#58a6ff;font-size:0.82rem">yfinance</code> library.
+        Risk-free rate defaults to the approximate 3-month T-bill yield — update manually for precision.
+        Volatility input is user-specified (use VIX/100 as a rough ATM approximation).
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+  let optionType = 'call';
+
+  function setType(t) {
+    optionType = t;
+    document.getElementById('btn-call').className = t === 'call' ? 'active call' : 'call';
+    document.getElementById('btn-put').className  = t === 'put'  ? 'active put'  : 'put';
+    const box = document.getElementById('price-box');
+    const val = document.getElementById('res-price');
+    if (t === 'put') {
+      box.classList.add('put-featured');
+      val.classList.add('put');
+      val.classList.remove('');
+    } else {
+      box.classList.remove('put-featured');
+      val.classList.remove('put');
+    }
+  }
+
+  async function loadSpx() {
+    try {
+      const res = await fetch('/api/spx');
+      const data = await res.json();
+      document.getElementById('spx-price').textContent = '$' + data.price.toLocaleString('en-US', {minimumFractionDigits: 2});
+      const statusEl = document.getElementById('spx-status');
+      statusEl.textContent = data.status === 'live' ? '● LIVE' : '○ fallback';
+      if (data.status !== 'live') statusEl.classList.add('fallback');
+
+      // Pre-fill spot
+      if (!document.getElementById('spot').value) {
+        document.getElementById('spot').value = data.price;
+        document.getElementById('strike').value = Math.round(data.price / 10) * 10;
+      }
+    } catch (e) {
+      document.getElementById('spx-status').textContent = 'error';
+      document.getElementById('spx-status').classList.add('fallback');
+    }
+  }
+
+  function setDefaultExpiry() {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    document.getElementById('expiry').value = d.toISOString().split('T')[0];
+  }
+
+  async function priceOption() {
+    const errEl = document.getElementById('error-msg');
+    errEl.style.display = 'none';
+
+    const payload = {
+      spot:   document.getElementById('spot').value,
+      strike: document.getElementById('strike').value,
+      expiry: document.getElementById('expiry').value,
+      rate:   document.getElementById('rate').value,
+      vol:    document.getElementById('vol').value,
+      type:   optionType,
+    };
+    const mp = document.getElementById('market_price').value;
+    if (mp) payload.market_price = mp;
+
+    if (!payload.spot || !payload.strike || !payload.expiry || !payload.vol) {
+      errEl.textContent = 'Please fill in all required fields.';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/price', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const d = await res.json();
+      if (d.error) { errEl.textContent = d.error; errEl.style.display = 'block'; return; }
+
+      document.getElementById('results-card').classList.remove('hidden');
+      document.getElementById('res-price').textContent = '$' + d.price.toFixed(2);
+      document.getElementById('res-dte').textContent   = d.dte;
+      document.getElementById('res-pct').textContent   = (d.pct_from_spot > 0 ? '+' : '') + d.pct_from_spot + '%';
+      document.getElementById('res-moneyness').innerHTML =
+        '<span class="moneyness-badge ' + d.moneyness + '">' + d.moneyness + '</span>';
+
+      document.getElementById('g-delta').textContent = d.greeks.delta;
+      document.getElementById('g-gamma').textContent = d.greeks.gamma;
+      document.getElementById('g-theta').textContent = '$' + d.greeks.theta;
+      document.getElementById('g-vega').textContent  = '$' + d.greeks.vega;
+      document.getElementById('g-rho').textContent   = '$' + d.greeks.rho;
+
+      const ivBox = document.getElementById('iv-box');
+      if (d.implied_vol !== null && d.implied_vol !== undefined) {
+        ivBox.style.display = '';
+        document.getElementById('res-iv').textContent = d.implied_vol + '%';
+        document.getElementById('pct-box').style.gridColumn = '';
+      } else {
+        ivBox.style.display = 'none';
+      }
+
+      document.getElementById('results-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e) {
+      errEl.textContent = 'Server error: ' + e.message;
+      errEl.style.display = 'block';
+    }
+  }
+
+  function reset() {
+    ['spot','strike','rate','vol','market_price'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('rate').value = '4.30';
+    document.getElementById('vol').value  = '15';
+    setDefaultExpiry();
+    document.getElementById('results-card').classList.add('hidden');
+    document.getElementById('error-msg').style.display = 'none';
+    loadSpx();
+  }
+
+  setDefaultExpiry();
+  loadSpx();
+</script>
+</body>
+</html>
