@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SPY Options Pricer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Georgia', serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+      padding: 40px 20px 80px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.8rem;
+      font-weight: normal;
+      letter-spacing: 0.08em;
+      color: #c9d1d9;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #6e7681;
+      margin-bottom: 36px;
+      font-family: 'Courier New', monospace;
+    }
+
+    .live-bar {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 32px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-family: 'Courier New', monospace;
+    }
+
+    .badge-label { color: #6e7681; font-size: 0.8rem; }
+    .badge-value { font-size: 1.3rem; color: #58a6ff; font-weight: bold; }
+    .badge-value.sm { font-size: 1rem; }
+
+    .live-dot {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: #1f2d1f;
+      color: #3fb950;
+      border: 1px solid #238636;
+    }
+    .live-dot.err {
+      background: #2d1f1f;
+      color: #f85149;
+      border-color: #da3633;
+    }
+
+    .container { max-width: 820px; margin: 0 auto; }
+
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+
+    .card h2 {
+      font-size: 0.8rem;
+      font-family: 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #6e7681;
+      margin-bottom: 22px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #21262d;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+
+    label {
+      font-size: 0.72rem;
+      color: #8b949e;
+      font-family: 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    label span { text-transform: none; letter-spacing: 0; font-size: 0.68rem; color: #3fb950; }
+
+    input, select {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      padding: 9px 12px;
+      font-size: 0.95rem;
+      font-family: 'Courier New', monospace;
+      transition: border-color 0.15s;
+      width: 100%;
+    }
+
+    input:focus { outline: none; border-color: #58a6ff; }
+
+    .type-toggle {
+      display: flex;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .type-toggle button {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #6e7681;
+      padding: 9px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .type-toggle button.active.call { background: #1f3a5c; color: #58a6ff; }
+    .type-toggle button.active.put  { background: #3a1f1f; color: #f85149; }
+
+    .btn-row { display: flex; gap: 12px; margin-top: 20px; }
+
+    .btn {
+      padding: 11px 24px;
+      border: none;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.82; }
+    .btn-primary  { background: #238636; color: #fff; }
+    .btn-secondary { background: #21262d; color: #8b949e; border: 1px solid #30363d; }
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .result-box {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 18px;
+      text-align: center;
+    }
+
+    .result-box.featured { border-color: #238636; background: #0f1e0f; }
+    .result-box.featured.put { border-color: #da3633; background: #1e0f0f; }
+
+    .result-label {
+      font-size: 0.7rem;
+      color: #6e7681;
+      font-family: 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 6px;
+    }
+
+    .result-value { font-size: 2rem; font-family: 'Courier New', monospace; font-weight: bold; color: #3fb950; }
+    .result-value.put-val { color: #f85149; }
+    .result-value.neutral { color: #e6edf3; font-size: 1.2rem; }
+    .result-sub { font-size: 0.75rem; color: #6e7681; margin-top: 4px; }
+
+    .greeks-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .greek-box {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      padding: 14px 10px;
+      text-align: center;
+    }
+
+    .greek-sym { font-size: 1.1rem; font-style: italic; color: #58a6ff; margin-bottom: 4px; }
+    .greek-val { font-family: 'Courier New', monospace; font-size: 0.95rem; color: #e6edf3; }
+    .greek-name { font-size: 0.65rem; color: #6e7681; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 3px; }
+
+    .m-badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 10px;
+      font-size: 0.75rem;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+    }
+    .ITM { background: #1f3a1f; color: #3fb950; border: 1px solid #238636; }
+    .OTM { background: #2d2d1f; color: #e3b341; border: 1px solid #9e6a03; }
+    .ATM { background: #1f2d3a; color: #58a6ff; border: 1px solid #1f6feb; }
+
+    .hidden { display: none; }
+
+    #err {
+      background: #2d1f1f;
+      border: 1px solid #da3633;
+      border-radius: 6px;
+      color: #f85149;
+      padding: 10px 14px;
+      font-size: 0.85rem;
+      font-family: 'Courier New', monospace;
+      margin-top: 12px;
+      display: none;
+    }
+
+    /* Methodology */
+    .ms { margin-bottom: 20px; }
+    .ms h3 { font-size: 0.85rem; color: #58a6ff; font-family: 'Courier New', monospace; margin-bottom: 10px; }
+    .ms p, .ms li { font-size: 0.88rem; color: #8b949e; line-height: 1.7; }
+    .ms ul { padding-left: 20px; }
+    .ms li { margin-bottom: 4px; }
+
+    .fblock {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      padding: 14px 18px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.82rem;
+      color: #c9d1d9;
+      line-height: 1.9;
+      margin: 10px 0;
+    }
+    .fblock .v { color: #58a6ff; }
+    .fblock .o { color: #e3b341; }
+
+    .ag {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .ai {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 0.83rem;
+      color: #8b949e;
+      line-height: 1.5;
+    }
+    .ai .dot { width: 6px; height: 6px; border-radius: 50%; background: #30363d; margin-top: 6px; flex-shrink: 0; }
+
+    @media (max-width: 600px) {
+      .form-grid { grid-template-columns: 1fr 1fr; }
+      .greeks-grid { grid-template-columns: repeat(3, 1fr); }
+      .results-grid { grid-template-columns: 1fr; }
+      .ag { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>SPY Options Pricer</h1>
+  <p class="subtitle">Black-Scholes · S&P 500 ETF · Live market data</p>
+
+  <div class="live-bar">
+    <div class="badge">
+      <span class="badge-label">SPY</span>
+      <span class="badge-value" id="b-spy">—</span>
+      <span class="live-dot" id="b-status">loading</span>
+    </div>
+    <div class="badge">
+      <span class="badge-label">^VIX</span>
+      <span class="badge-value sm" id="b-vix">—</span>
+    </div>
+    <div class="badge">
+      <span class="badge-label">3M T-Bill</span>
+      <span class="badge-value sm" id="b-rate">—</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Parameters</h2>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Option Type</label>
+        <div class="type-toggle">
+          <button id="btn-call" class="active call" onclick="setType('call')">Call</button>
+          <button id="btn-put" class="put" onclick="setType('put')">Put</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Spot (S) <span id="spot-tag"></span></label>
+        <input type="number" id="spot" step="0.01" placeholder="loading..." />
+      </div>
+
+      <div class="form-group">
+        <label>Strike (K)</label>
+        <input type="number" id="strike" step="0.01" placeholder="—" />
+      </div>
+
+      <div class="form-group">
+        <label>Expiry Date</label>
+        <input type="date" id="expiry" />
+      </div>
+
+      <div class="form-group">
+        <label>Risk-Free Rate (%) <span id="rate-tag"></span></label>
+        <input type="number" id="rate" step="0.01" placeholder="loading..." />
+      </div>
+
+      <div class="form-group">
+        <label>Implied Vol (%) <span id="vol-tag"></span></label>
+        <input type="number" id="vol" step="0.1" placeholder="loading..." />
+      </div>
+    </div>
+
+    <div class="form-grid" style="margin-top:16px;">
+      <div class="form-group" style="grid-column:span 3;">
+        <label>Market Price (optional — back out IV)</label>
+        <input type="number" id="mkt" step="0.01" placeholder="Leave blank to use vol above" />
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="price()">Price Option</button>
+      <button class="btn btn-secondary" onclick="reset()">Reset</button>
+    </div>
+    <div id="err"></div>
+  </div>
+
+  <div class="card hidden" id="res-card">
+    <h2>Results</h2>
+    <div class="results-grid">
+      <div class="result-box featured" id="price-box">
+        <div class="result-label">Theoretical Price</div>
+        <div class="result-value" id="r-price">—</div>
+        <div class="result-sub" id="r-money">—</div>
+      </div>
+      <div class="result-box">
+        <div class="result-label">Days to Expiry</div>
+        <div class="result-value neutral" id="r-dte">—</div>
+        <div class="result-sub">calendar days</div>
+      </div>
+      <div class="result-box hidden" id="iv-box">
+        <div class="result-label">Implied Volatility</div>
+        <div class="result-value neutral" id="r-iv">—</div>
+        <div class="result-sub">from market price</div>
+      </div>
+      <div class="result-box" id="pct-box">
+        <div class="result-label">Strike vs Spot</div>
+        <div class="result-value neutral" id="r-pct">—</div>
+        <div class="result-sub">% difference</div>
+      </div>
+    </div>
+
+    <h2 style="margin-top:24px;">Greeks</h2>
+    <div class="greeks-grid">
+      <div class="greek-box"><div class="greek-sym">Δ</div><div class="greek-val" id="g-delta">—</div><div class="greek-name">Delta</div></div>
+      <div class="greek-box"><div class="greek-sym">Γ</div><div class="greek-val" id="g-gamma">—</div><div class="greek-name">Gamma</div></div>
+      <div class="greek-box"><div class="greek-sym">Θ</div><div class="greek-val" id="g-theta">—</div><div class="greek-name">Theta / day</div></div>
+      <div class="greek-box"><div class="greek-sym">ν</div><div class="greek-val" id="g-vega">—</div><div class="greek-name">Vega / 1% σ</div></div>
+      <div class="greek-box"><div class="greek-sym">ρ</div><div class="greek-val" id="g-rho">—</div><div class="greek-name">Rho / 1% r</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Methodology</h2>
+
+    <div class="ms">
+      <h3>Model: Black-Scholes (1973)</h3>
+      <p>Uses the Black-Scholes-Merton framework — the standard closed-form model for European-style options.
+      SPY options are technically American-style, but early exercise is rarely optimal (except for deep ITM puts near ex-dividend dates),
+      making Black-Scholes a reliable approximation in most cases.</p>
+    </div>
+
+    <div class="ms">
+      <h3>Pricing Formulas</h3>
+      <div class="fblock">
+        <span class="v">d₁</span> <span class="o">=</span> [ ln(<span class="v">S</span>/<span class="v">K</span>) + (<span class="v">r</span> + σ²/2)·<span class="v">T</span> ] / ( σ·√<span class="v">T</span> )<br>
+        <span class="v">d₂</span> <span class="o">=</span> <span class="v">d₁</span> − σ·√<span class="v">T</span><br><br>
+        <span class="o">Call</span> = <span class="v">S</span>·N(<span class="v">d₁</span>) − <span class="v">K</span>·e<sup>−rT</sup>·N(<span class="v">d₂</span>)<br>
+        <span class="o">Put</span>  = <span class="v">K</span>·e<sup>−rT</sup>·N(−<span class="v">d₂</span>) − <span class="v">S</span>·N(−<span class="v">d₁</span>)
+      </div>
+      <p style="margin-top:8px;">
+        <strong style="color:#c9d1d9">N(·)</strong> = standard normal CDF &nbsp;·&nbsp;
+        <strong style="color:#c9d1d9">S</strong> = spot &nbsp;·&nbsp;
+        <strong style="color:#c9d1d9">K</strong> = strike &nbsp;·&nbsp;
+        <strong style="color:#c9d1d9">r</strong> = risk-free rate &nbsp;·&nbsp;
+        <strong style="color:#c9d1d9">σ</strong> = vol &nbsp;·&nbsp;
+        <strong style="color:#c9d1d9">T</strong> = years to expiry
+      </p>
+    </div>
+
+    <div class="ms">
+      <h3>Greeks</h3>
+      <div class="fblock">
+        <span class="v">Δ</span> Delta  = ∂V/∂S   → sensitivity to $1 move in spot<br>
+        <span class="v">Γ</span> Gamma  = ∂²V/∂S² → rate of change of delta<br>
+        <span class="v">Θ</span> Theta  = ∂V/∂t   → daily time decay<br>
+        <span class="v">ν</span> Vega   = ∂V/∂σ   → P&amp;L per 1% increase in vol<br>
+        <span class="v">ρ</span> Rho    = ∂V/∂r   → P&amp;L per 1% increase in rate
+      </div>
+    </div>
+
+    <div class="ms">
+      <h3>Implied Volatility</h3>
+      <p>When a market price is provided, IV is solved via <strong style="color:#c9d1d9">bisection</strong> —
+      iteratively narrowing a bracket until the model price matches the market price to within $0.001.</p>
+    </div>
+
+    <div class="ms">
+      <h3>Live Data</h3>
+      <p>Spot, VIX, and 3M T-bill rate are fetched from Yahoo Finance on load and refresh every 30 seconds.
+      Spot pre-fills automatically. VIX seeds the vol input as an ATM 30-day approximation — adjust for your specific strike/tenor.
+      Rate uses the 13-week T-bill yield (^IRX).</p>
+    </div>
+
+    <div class="ms">
+      <h3>Assumptions &amp; Limitations</h3>
+      <div class="ag">
+        <div class="ai"><div class="dot"></div><span>Continuous log-normal returns — no jumps</span></div>
+        <div class="ai"><div class="dot"></div><span>Constant vol over option life (flat vol surface)</span></div>
+        <div class="ai"><div class="dot"></div><span>Constant risk-free rate</span></div>
+        <div class="ai"><div class="dot"></div><span>No transaction costs or taxes</span></div>
+        <div class="ai"><div class="dot"></div><span>SPY dividend yield not modeled — use Merton extension for precision</span></div>
+        <div class="ai"><div class="dot"></div><span>Real markets exhibit volatility skew not captured here</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Math ──────────────────────────────────────────────────────────────────
+
+  function normCDF(x) {
+    const sign = x >= 0 ? 1 : -1;
+    const a = Math.abs(x) / Math.SQRT2;
+    const t = 1 / (1 + 0.3275911 * a);
+    const poly = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
+    return 0.5 * (1 + sign * (1 - poly * Math.exp(-a * a)));
+  }
+
+  function normPDF(x) {
+    return Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+  }
+
+  function d1d2(S, K, T, r, sig) {
+    const d1 = (Math.log(S / K) + (r + 0.5 * sig * sig) * T) / (sig * Math.sqrt(T));
+    return [d1, d1 - sig * Math.sqrt(T)];
+  }
+
+  function bs(S, K, T, r, sig, type) {
+    if (T <= 0) return type === 'call' ? Math.max(S - K, 0) : Math.max(K - S, 0);
+    const [d1, d2] = d1d2(S, K, T, r, sig);
+    const disc = Math.exp(-r * T);
+    return type === 'call'
+      ? S * normCDF(d1) - K * disc * normCDF(d2)
+      : K * disc * normCDF(-d2) - S * normCDF(-d1);
+  }
+
+  function greeks(S, K, T, r, sig, type) {
+    if (T <= 0) return { delta:0, gamma:0, theta:0, vega:0, rho:0 };
+    const [d1, d2] = d1d2(S, K, T, r, sig);
+    const sqT = Math.sqrt(T), phi = normPDF(d1), disc = Math.exp(-r * T);
+    const gamma = phi / (S * sig * sqT);
+    const vega  = S * phi * sqT / 100;
+    let delta, theta, rho;
+    if (type === 'call') {
+      delta = normCDF(d1);
+      theta = (-S * phi * sig / (2 * sqT) - r * K * disc * normCDF(d2)) / 365;
+      rho   = K * T * disc * normCDF(d2) / 100;
+    } else {
+      delta = normCDF(d1) - 1;
+      theta = (-S * phi * sig / (2 * sqT) + r * K * disc * normCDF(-d2)) / 365;
+      rho   = -K * T * disc * normCDF(-d2) / 100;
+    }
+    return { delta, gamma, theta, vega, rho };
+  }
+
+  function impliedVol(mktPrice, S, K, T, r, type) {
+    if (T <= 0) return null;
+    const intr = type === 'call' ? Math.max(S-K,0) : Math.max(K-S,0);
+    if (mktPrice <= intr) return null;
+    let lo = 0.001, hi = 10.0;
+    for (let i = 0; i < 200; i++) {
+      const mid = (lo + hi) / 2;
+      const p   = bs(S, K, T, r, mid, type);
+      if (Math.abs(p - mktPrice) < 0.0001) return mid * 100;
+      p > mktPrice ? hi = mid : lo = mid;
+    }
+    return ((lo + hi) / 2) * 100;
+  }
+
+  // ── Live data ─────────────────────────────────────────────────────────────
+
+  async function fetchMarket() {
+    const yUrl = 'https://query1.finance.yahoo.com/v7/finance/quote?symbols=SPY,%5EVIX,%5EIRX&fields=regularMarketPrice';
+    const url  = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(yUrl);
+    try {
+      const res  = await fetch(url);
+      const data = await res.json();
+      const map  = {};
+      (data.quoteResponse?.result || []).forEach(q => map[q.symbol] = q.regularMarketPrice);
+      return { spy: map['SPY'], vix: map['^VIX'], rate: map['^IRX'], live: true };
+    } catch(e) {
+      return { spy: null, vix: null, rate: null, live: false };
+    }
+  }
+
+  async function loadMarket() {
+    const d = await fetchMarket();
+    const tag = d.live ? '↑ live' : '↑ fallback';
+    const statusEl = document.getElementById('b-status');
+
+    if (d.spy)  {
+      document.getElementById('b-spy').textContent  = '$' + d.spy.toFixed(2);
+      document.getElementById('spot').value = d.spy.toFixed(2);
+      document.getElementById('spot-tag').textContent = tag;
+      if (!document.getElementById('strike').value)
+        document.getElementById('strike').value = Math.round(d.spy);
+    }
+    if (d.vix)  {
+      document.getElementById('b-vix').textContent  = d.vix.toFixed(2) + '%';
+      if (!document.getElementById('vol').value) {
+        document.getElementById('vol').value = d.vix.toFixed(2);
+        document.getElementById('vol-tag').textContent = tag + ' (^VIX)';
+      }
+    }
+    if (d.rate) {
+      document.getElementById('b-rate').textContent = d.rate.toFixed(2) + '%';
+      if (!document.getElementById('rate').value) {
+        document.getElementById('rate').value = d.rate.toFixed(2);
+        document.getElementById('rate-tag').textContent = tag + ' (^IRX)';
+      }
+    }
+
+    statusEl.textContent = d.live ? '● LIVE' : '○ fallback';
+    if (!d.live) statusEl.classList.add('err');
+    else statusEl.classList.remove('err');
+  }
+
+  // ── UI ────────────────────────────────────────────────────────────────────
+
+  let optType = 'call';
+
+  function setType(t) {
+    optType = t;
+    document.getElementById('btn-call').className = t === 'call' ? 'active call' : 'call';
+    document.getElementById('btn-put').className  = t === 'put'  ? 'active put'  : 'put';
+    const pBox = document.getElementById('price-box');
+    const pVal = document.getElementById('r-price');
+    if (t === 'put') { pBox.classList.add('put'); pVal.classList.add('put-val'); }
+    else             { pBox.classList.remove('put'); pVal.classList.remove('put-val'); }
+  }
+
+  function price() {
+    const errEl = document.getElementById('err');
+    errEl.style.display = 'none';
+
+    const S   = parseFloat(document.getElementById('spot').value);
+    const K   = parseFloat(document.getElementById('strike').value);
+    const r   = parseFloat(document.getElementById('rate').value) / 100;
+    const sig = parseFloat(document.getElementById('vol').value) / 100;
+    const exp = document.getElementById('expiry').value;
+    const mp  = document.getElementById('mkt').value;
+
+    if (!S || !K || !exp || !sig) {
+      errEl.textContent = 'Please fill in spot, strike, expiry, and vol.';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    const T = Math.max((new Date(exp) - new Date()) / (365.25 * 24 * 3600 * 1000), 0);
+    const p = bs(S, K, T, r, sig, optType);
+    const g = greeks(S, K, T, r, sig, optType);
+
+    const pct = (S - K) / K * 100;
+    let money = optType === 'call'
+      ? (S > K ? 'ITM' : S === K ? 'ATM' : 'OTM')
+      : (S < K ? 'ITM' : S === K ? 'ATM' : 'OTM');
+
+    document.getElementById('res-card').classList.remove('hidden');
+    document.getElementById('r-price').textContent = '$' + p.toFixed(2);
+    document.getElementById('r-dte').textContent   = Math.round(T * 365.25);
+    document.getElementById('r-pct').textContent   = (pct > 0 ? '+' : '') + pct.toFixed(2) + '%';
+    document.getElementById('r-money').innerHTML   = `<span class="m-badge ${money}">${money}</span>`;
+
+    document.getElementById('g-delta').textContent = g.delta.toFixed(4);
+    document.getElementById('g-gamma').textContent = g.gamma.toFixed(6);
+    document.getElementById('g-theta').textContent = '$' + g.theta.toFixed(4);
+    document.getElementById('g-vega').textContent  = '$' + g.vega.toFixed(4);
+    document.getElementById('g-rho').textContent   = '$' + g.rho.toFixed(4);
+
+    const ivBox = document.getElementById('iv-box');
+    if (mp) {
+      const iv = impliedVol(parseFloat(mp), S, K, T, r, optType);
+      if (iv !== null) {
+        ivBox.classList.remove('hidden');
+        document.getElementById('r-iv').textContent = iv.toFixed(2) + '%';
+      } else {
+        ivBox.classList.add('hidden');
+      }
+    } else {
+      ivBox.classList.add('hidden');
+    }
+
+    document.getElementById('res-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function reset() {
+    ['strike','mkt'].forEach(id => document.getElementById(id).value = '');
+    ['rate','vol'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('res-card').classList.add('hidden');
+    document.getElementById('err').style.display = 'none';
+    loadMarket();
+  }
+
+  function setDefaultExpiry() {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    document.getElementById('expiry').value = d.toISOString().split('T')[0];
+  }
+
+  setDefaultExpiry();
+  loadMarket();
+  setInterval(loadMarket, 30000);
+</script>
+</body>
+</html>
